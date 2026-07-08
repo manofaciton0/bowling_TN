@@ -721,11 +721,17 @@ function autoAdvanceBye(rIndex, mIndex) {
 function renderBracket() {
     const container = document.getElementById('bracket-container');
     if (!container) return;
+    const previousScrollLeft = container.scrollLeft || 0;
+    const previousScrollTop = container.scrollTop || 0;
+    const hasRenderedBoard = Boolean(container.querySelector('.bracket-board'));
     if (clearInvalidFinalWinner()) {
         saveToLocalStorage();
     }
     container.innerHTML = '';
     container.dataset.finalRoundTeamCount = String(FINAL_ROUND_TEAM_COUNT);
+
+    const board = document.createElement('div');
+    board.className = 'bracket-board';
 
     bracketState.forEach((round, rIndex) => {
         const roundDiv = document.createElement('div');
@@ -774,10 +780,17 @@ function renderBracket() {
             });
         }
 
-        container.appendChild(roundDiv);
+        board.appendChild(roundDiv);
     });
 
-    renderChampion(container);
+    renderChampion(board);
+    container.appendChild(board);
+    if (hasRenderedBoard) {
+        container.scrollLeft = Math.min(previousScrollLeft, Math.max(0, container.scrollWidth - container.clientWidth));
+        container.scrollTop = previousScrollTop;
+    } else {
+        container.scrollLeft = 0;
+    }
     renderTeamSidebar();
     scheduleRenderBracketLines();
 }
