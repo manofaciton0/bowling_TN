@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>볼링대회 18팀 토너먼트 대진표</title>
+    <link rel="stylesheet" href="bracket-style.css">
+</head>
+<body class="theme-light">
+    <!-- top bar (접기/펼치기 가능) -->
+    <nav class="top-bar" id="top-bar">
+        <div class="top-bar-main">
+            <h1 id="tournament-title">아이씨바이오 상반기 결산 볼링대회</h1>
+            <button id="btn-nav-toggle" class="nav-toggle-btn" type="button" title="메뉴 접기/펼치기">
+                <span class="nav-toggle-icon">▲</span>
+            </button>
+        </div>
+        <div class="top-bar-collapsible" id="top-bar-collapsible">
+            <p class="top-bar-desc">승자를 클릭하면 다음 라운드로 자동 진출합니다!</p>
+            <div class="action-buttons">
+                <button id="btn-help" class="action-btn help-btn" type="button" aria-controls="help-modal" aria-expanded="false">사용설명서</button>
+                <button id="btn-download" class="action-btn" type="button">📥 대진 현황 다운로드</button>
+                <button id="btn-restore" class="action-btn" type="button">📤 대진 복원</button>
+                <button id="btn-reset" class="action-btn reset-btn" type="button">🔄 초기화</button>
+                <button id="btn-theme" class="action-btn theme-btn" type="button">어두운 테마</button>
+            </div>
+        </div>
+    </nav>
+
+    <button id="btn-sidebar-toggle" class="team-sidebar-toggle" type="button" aria-controls="team-sidebar" aria-expanded="false">
+        팀 목록
+    </button>
+
+    <div id="team-sidebar-overlay" class="team-sidebar-overlay" aria-hidden="true"></div>
+
+    <aside id="team-sidebar" class="team-sidebar" aria-hidden="true" aria-label="전체 팀과 팀원 목록">
+        <div class="team-sidebar-header">
+            <div>
+                <p class="team-sidebar-kicker">참가팀</p>
+                <h2>전체 팀 목록</h2>
+            </div>
+            <button id="btn-sidebar-close" class="team-sidebar-close" type="button" aria-label="팀 목록 닫기">×</button>
+        </div>
+        <div class="team-sidebar-body">
+            <p class="team-sidebar-summary">
+                총 <strong id="team-sidebar-count">0팀</strong>
+            </p>
+            <div id="team-sidebar-list" class="team-sidebar-list"></div>
+        </div>
+    </aside>
+
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+
+    <div class="bracket-container" id="bracket-container">
+        <!-- JavaScript가 이 곳에 대진표를 그립니다. -->
+    </div>
+
+    <!-- 에러/CORS 경고 표시용 토스트 메시지 -->
+    <div id="toast"></div>
+
+    <div id="help-modal-overlay" class="help-modal-overlay" aria-hidden="true"></div>
+    <section id="help-modal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" aria-hidden="true">
+        <div class="help-modal-header">
+            <div>
+                <p class="help-modal-kicker">처음 사용하는 분을 위한 안내</p>
+                <h2 id="help-modal-title">사용설명서</h2>
+            </div>
+            <button id="btn-help-close" class="help-modal-close" type="button" aria-label="사용설명서 닫기">×</button>
+        </div>
+        <div class="help-modal-body">
+            <ol class="help-guide-list">
+                <li>
+                    <strong>팀을 클릭하면 다음 토너먼트로 진출합니다.</strong>
+                    이미 승자로 선택된 팀을 다시 클릭하면 그 팀은 위 토너먼트에서 내려오고, 이전 경기 기록은 남습니다.
+                </li>
+                <li>
+                    <strong>팀 점수칸을 누르면 개인 점수를 입력할 수 있습니다.</strong>
+                    팀원별 점수를 입력하면 합산 점수가 팀 점수칸에 자동으로 표시됩니다.
+                </li>
+                <li>
+                    <strong>대진 현황 다운로드는 꼭 해두세요.</strong>
+                    현재 진행 상황은 브라우저에 임시 저장됩니다. 나중에 데이터로 쓰거나 다른 기기에서 이어가려면 다운로드 파일이 필요합니다.
+                </li>
+                <li>
+                    <strong>초기화는 모든 대진 현황을 삭제합니다.</strong>
+                    다만 다운로드해 둔 파일이 있으면 대진 복원 버튼으로 다시 불러올 수 있습니다.
+                </li>
+                <li>
+                    <strong>본선 6강 이후 순위가 자동 확정됩니다.</strong>
+                    본선 6강 진출팀 3팀 중 점수가 가장 낮은 팀은 자동 3등, 진출하지 못한 3팀 중 점수가 가장 높은 팀은 4등으로 확정됩니다.
+                </li>
+            </ol>
+        </div>
+    </section>
+
+    <script>
+        window.BOWLING_BRACKET_CONFIG = {
+            version: '18-team-12-prelim-final3-v1',
+            title: '아이씨바이오 상반기 결산 볼링대회',
+            format: {
+                totalTeams: 18,
+                preliminaryTeams: 12,
+                directMainTeams: 6,
+                finalRoundTeamCount: 3,
+                byeRule: '예선 6경기 승자 6팀이 대기 6팀과 본선 12강을 치릅니다.',
+                directMainLegendText: '경기 없이 본선 12강 대기',
+                roundTitles: ['예선 12강', '본선 12강', '본선 6강', '결승'],
+                preliminaryRoutes: [
+                    { matchIndex: 0, slot: 'p1' },
+                    { matchIndex: 1, slot: 'p1' },
+                    { matchIndex: 2, slot: 'p1' },
+                    { matchIndex: 3, slot: 'p1' },
+                    { matchIndex: 4, slot: 'p1' },
+                    { matchIndex: 5, slot: 'p1' }
+                ],
+                preliminaryLanes: [[0], [1], [2], [3], [4], [5]]
+            }
+        };
+    </script>
+    <script src="bracket.js"></script>
+</body>
+</html>
