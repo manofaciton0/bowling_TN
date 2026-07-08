@@ -615,7 +615,7 @@ function selectWinner(rIndex, mIndex, player) {
     }
 
     if (isLockedThirdPlaceSelection(currentMatch, player)) {
-        showToast('본선 6강 점수가 가장 낮아 3등이 확정된 팀입니다.');
+        showToast('결승전 점수가 가장 낮아 3등이 확정될 팀입니다.');
         return;
     }
 
@@ -1142,7 +1142,7 @@ function createMatchDiv(match, rIndex, mIndex) {
             match.winner,
             () => selectWinner(rIndex, mIndex, match[slot]),
             match[`${slot}Score`],
-            isByeMatch || placement?.rank === 3 ? null : (val, memberScores) => {
+            isByeMatch ? null : (val, memberScores) => {
                 match[`${slot}Score`] = val;
                 match[`${slot}MemberScores`] = memberScores;
                 saveToLocalStorage();
@@ -1167,7 +1167,7 @@ function isLockedThirdPlaceSelection(match, player) {
     const slots = getMatchSlots(match);
     if (slots.length < 3 || match !== bracketState[bracketState.length - 1]?.[0]) return false;
 
-    const thirdPlaceSlot = getLowestFinalQualifierSlot(match);
+    const thirdPlaceSlot = getLowestFinalScoreSlot(match, { requireWinner: false });
     return Boolean(thirdPlaceSlot && match[thirdPlaceSlot] === player);
 }
 
@@ -1186,7 +1186,7 @@ function getFinalPlacement(match, slot) {
     const player = match[slot];
     if (!player || slots.length < 3) return null;
 
-    const thirdPlaceSlot = getLowestFinalQualifierSlot(match);
+    const thirdPlaceSlot = getLowestFinalScoreSlot(match);
     if (slot === thirdPlaceSlot) {
         return {
             rank: 3,
@@ -1221,42 +1221,38 @@ function getFinalQualifyingPlacement(fourthPlaceQualifier, rIndex, mIndex, slot)
     return null;
 }
 
-function getLowestFinalQualifierSlot(finalMatch) {
+function getLowestFinalScoreSlot(finalMatch, options = {}) {
     if (finalMatch !== bracketState[bracketState.length - 1]?.[0]) return null;
+    if (options.requireWinner !== false && !finalMatch.winner) return null;
 
-    const finalRoundIndex = bracketState.length - 1;
-    const qualifierRoundIndex = finalRoundIndex - 1;
-    const qualifierRound = bracketState[qualifierRoundIndex];
-    if (!Array.isArray(qualifierRound) || getMatchSlots(finalMatch).length < 3) return null;
+    const slots = getMatchSlots(finalMatch);
+    if (slots.length < 3) return null;
 
-    const finalistScores = qualifierRound
-        .map((match, matchIndex) => {
-            const route = getRoute(qualifierRoundIndex, matchIndex);
-            if (!route || route.roundIndex !== finalRoundIndex || route.matchIndex !== 0 || !route.slot) return null;
-            if (!finalMatch[route.slot] || finalMatch[route.slot] !== match.winner) return null;
-
-            const score = getWinnerScore(match);
+    const finalScores = slots
+        .map(slot => {
+            if (!finalMatch[slot]) return null;
+            const score = parseScoreValue(finalMatch[`${slot}Score`]);
             if (score === null) return null;
 
             return {
-                slot: route.slot,
+                slot,
                 score
             };
         })
         .filter(Boolean);
 
-    if (finalistScores.length !== getMatchSlots(finalMatch).length) return null;
+    if (finalScores.length !== slots.length) return null;
 
-    finalistScores.sort((a, b) => a.score - b.score);
-    if (finalistScores[0].score === finalistScores[1].score) return null;
+    finalScores.sort((a, b) => a.score - b.score);
+    if (finalScores[0].score === finalScores[1]?.score) return null;
 
-    return finalistScores[0].slot;
+    return finalScores[0].slot;
 }
 
 function getFourthPlaceQualifier() {
     const finalMatch = bracketState[bracketState.length - 1]?.[0];
     if (!finalMatch || getMatchSlots(finalMatch).length < 3) return null;
-    if (!getLowestFinalQualifierSlot(finalMatch)) return null;
+    if (!getLowestFinalScoreSlot(finalMatch)) return null;
 
     const qualifierRoundIndex = bracketState.length - 2;
     const qualifierRound = bracketState[qualifierRoundIndex];
@@ -1287,15 +1283,6 @@ function getFourthPlaceQualifier() {
     if (loserScores[0].score === loserScores[1]?.score) return null;
 
     return loserScores[0];
-}
-
-function getWinnerScore(match) {
-    if (!match?.winner) return null;
-
-    const winnerSlot = getMatchSlots(match).find(slot => match[slot] === match.winner);
-    if (!winnerSlot) return null;
-
-    return parseScoreValue(match[`${winnerSlot}Score`]);
 }
 
 function parseScoreValue(value) {
