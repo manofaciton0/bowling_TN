@@ -105,6 +105,11 @@ body {
     overflow-x: hidden;
 }
 
+body.team-sidebar-open,
+body.help-modal-open {
+    overflow: hidden;
+}
+
 .bg-orb {
     position: fixed;
     border-radius: 50%;
@@ -761,9 +766,9 @@ body.help-modal-open .help-modal {
     max-width: 100vw;
     box-sizing: border-box;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    flex: 1;
+    flex: 0 0 auto;
     position: relative;
     overscroll-behavior-x: contain;
     touch-action: pan-x pan-y;

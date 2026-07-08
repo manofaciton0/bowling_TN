@@ -722,7 +722,6 @@ function renderBracket() {
     const container = document.getElementById('bracket-container');
     if (!container) return;
     const previousScrollLeft = container.scrollLeft || 0;
-    const previousScrollTop = container.scrollTop || 0;
     const hasRenderedBoard = Boolean(container.querySelector('.bracket-board'));
     if (clearInvalidFinalWinner()) {
         saveToLocalStorage();
@@ -787,7 +786,6 @@ function renderBracket() {
     container.appendChild(board);
     if (hasRenderedBoard) {
         container.scrollLeft = Math.min(previousScrollLeft, Math.max(0, container.scrollWidth - container.clientWidth));
-        container.scrollTop = previousScrollTop;
     } else {
         container.scrollLeft = 0;
     }
