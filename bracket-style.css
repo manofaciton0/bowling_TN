@@ -961,6 +961,14 @@ body.help-modal-open .help-modal {
     touch-action: pan-x pan-y;
 }
 
+.bracket-stage {
+    position: relative;
+    width: -webkit-max-content;
+    width: max-content;
+    min-width: 100%;
+    transform-origin: top left;
+}
+
 .bracket-board {
     display: flex;
     flex-direction: column-reverse;
@@ -1084,6 +1092,17 @@ body.help-modal-open .help-modal {
         padding: 30px max(12px, env(safe-area-inset-right)) 64px max(12px, env(safe-area-inset-left));
         scroll-padding-left: max(12px, env(safe-area-inset-left));
         scroll-padding-right: max(12px, env(safe-area-inset-right));
+        touch-action: manipulation;
+    }
+
+    body.mobile-bracket-overview .bracket-container {
+        height: var(--mobile-bracket-height);
+        overflow: hidden;
+    }
+
+    body.mobile-bracket-overview .bracket-stage {
+        transform: scale(var(--mobile-bracket-scale));
+        pointer-events: none;
     }
 
     .round {

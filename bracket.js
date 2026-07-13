@@ -88,8 +88,61 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.addEventListener('click', closeMemberScoreEditors);
 
-    window.addEventListener('resize', scheduleRenderBracketLines);
+    const bracketContainer = document.getElementById('bracket-container');
+    bracketContainer?.addEventListener('dblclick', handleMobileBracketDoubleTap);
+    window.addEventListener('resize', handleBracketViewportResize);
 });
+
+function handleBracketViewportResize() {
+    scheduleRenderBracketLines();
+    scheduleMobileBracketView();
+}
+
+function handleMobileBracketDoubleTap(event) {
+    if (!window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) return;
+    if (!mobileBracketOverview && event.target.closest('button, input, .player, .member-score-popover')) return;
+
+    event.preventDefault();
+    mobileBracketOverview = !mobileBracketOverview;
+    applyMobileBracketView();
+}
+
+function scheduleMobileBracketView() {
+    window.cancelAnimationFrame(mobileBracketViewFrame);
+    mobileBracketViewFrame = window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(applyMobileBracketView);
+    });
+}
+
+function applyMobileBracketView() {
+    const container = document.getElementById('bracket-container');
+    const stage = container?.querySelector('.bracket-stage');
+    const isMobile = window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches;
+    if (!container || !stage) return;
+
+    if (!isMobile || !mobileBracketOverview) {
+        document.body.classList.remove('mobile-bracket-overview');
+        stage.style.removeProperty('--mobile-bracket-scale');
+        container.style.removeProperty('--mobile-bracket-height');
+        return;
+    }
+
+    const containerStyle = window.getComputedStyle(container);
+    const horizontalPadding = Number.parseFloat(containerStyle.paddingLeft)
+        + Number.parseFloat(containerStyle.paddingRight);
+    const verticalPadding = Number.parseFloat(containerStyle.paddingTop)
+        + Number.parseFloat(containerStyle.paddingBottom);
+    const stageWidth = stage.scrollWidth;
+    const stageHeight = stage.scrollHeight;
+    const availableWidth = Math.max(1, window.innerWidth - horizontalPadding);
+    const availableHeight = Math.max(240, window.innerHeight - container.getBoundingClientRect().top - 12);
+    const scale = Math.min(1, availableWidth / stageWidth, availableHeight / stageHeight);
+
+    stage.style.setProperty('--mobile-bracket-scale', String(scale));
+    container.style.setProperty('--mobile-bracket-height', `${Math.ceil(stageHeight * scale + verticalPadding)}px`);
+    container.scrollLeft = 0;
+    document.body.classList.add('mobile-bracket-overview');
+}
 
 function initializeNoticeSpeedSettings() {
     const savedSpeed = Number.parseInt(localStorage.getItem(NOTICE_SPEED_STORAGE_KEY), 10);
@@ -330,6 +383,9 @@ let expandedSidebarTeamName = null;
 const DEFAULT_NOTICE_SCROLL_SPEED = 200;
 const NOTICE_SPEED_STORAGE_KEY = 'bowling_notice_scroll_speed';
 let noticeScrollSpeed = DEFAULT_NOTICE_SCROLL_SPEED;
+const MOBILE_BRACKET_BREAKPOINT = 640;
+let mobileBracketOverview = true;
+let mobileBracketViewFrame = 0;
 
 const pageTournamentConfig = window.BOWLING_BRACKET_CONFIG || {};
 const pageFormatConfig = pageTournamentConfig.format || {};
@@ -994,6 +1050,9 @@ function renderBracket() {
     container.innerHTML = '';
     container.dataset.finalRoundTeamCount = String(FINAL_ROUND_TEAM_COUNT);
 
+    const stage = document.createElement('div');
+    stage.className = 'bracket-stage';
+
     const board = document.createElement('div');
     board.className = 'bracket-board';
 
@@ -1048,7 +1107,8 @@ function renderBracket() {
     });
 
     renderChampion(board);
-    container.appendChild(board);
+    stage.appendChild(board);
+    container.appendChild(stage);
     if (hasRenderedBoard) {
         container.scrollLeft = Math.min(previousScrollLeft, Math.max(0, container.scrollWidth - container.clientWidth));
     } else {
@@ -1056,6 +1116,7 @@ function renderBracket() {
     }
     renderTeamSidebar();
     scheduleRenderBracketLines();
+    scheduleMobileBracketView();
 }
 
 function renderTeamSidebar() {
@@ -1241,11 +1302,14 @@ function scheduleRenderBracketLines() {
 }
 
 function renderBracketLines(container) {
-    const oldLines = container.querySelector('.bracket-lines');
+    const stage = container.querySelector('.bracket-stage');
+    if (!stage) return;
+
+    const oldLines = stage.querySelector('.bracket-lines');
     if (oldLines) oldLines.remove();
 
-    const width = Math.max(container.scrollWidth, container.clientWidth);
-    const height = Math.max(container.scrollHeight, container.clientHeight);
+    const width = Math.max(stage.scrollWidth, container.clientWidth);
+    const height = Math.max(stage.scrollHeight, container.clientHeight);
     const svg = document.createElementNS(SVG_NS, 'svg');
     svg.classList.add('bracket-lines');
     svg.setAttribute('width', width);
@@ -1264,8 +1328,8 @@ function renderBracketLines(container) {
 
             drawBracketLine(
                 svg,
-                getElementPoint(sourceEl, container, 0.5, 0),
-                getElementPoint(targetEl, container, 0.5, 1),
+                getElementPoint(sourceEl, stage, 0.5, 0),
+                getElementPoint(targetEl, stage, 0.5, 1),
                 Boolean(match.winner)
             );
         });
@@ -1277,13 +1341,13 @@ function renderBracketLines(container) {
     if (finalEl && championEl) {
         drawBracketLine(
             svg,
-            getElementPoint(finalEl, container, 0.5, 0),
-            getElementPoint(championEl, container, 0.5, 1),
+            getElementPoint(finalEl, stage, 0.5, 0),
+            getElementPoint(championEl, stage, 0.5, 1),
             Boolean(finalMatch?.winner)
         );
     }
 
-    container.appendChild(svg);
+    stage.appendChild(svg);
 }
 
 function getMatchElement(container, rIndex, mIndex) {
