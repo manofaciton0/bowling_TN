@@ -421,6 +421,7 @@ body.notice-modal-open .notice-modal { opacity: 1; pointer-events: auto; transfo
 .notice-led-grid { position: absolute; inset: 0; opacity: 0.28; background-image: radial-gradient(circle, #1d5b2d 1px, transparent 1.5px); background-size: 6px 6px; pointer-events: none; }
 .notice-track { position: relative; width: 100%; white-space: nowrap; }
 .notice-text { display: inline-block; padding-left: 100%; color: #62ff7d; font-family: "Maru Minya Bitmap", "Courier New", monospace; font-size: 2.25rem; font-weight: 400; font-synthesis: none; letter-spacing: 0; text-shadow: 0 0 3px #20ff51, 0 0 9px rgba(32, 255, 81, 0.7); animation: notice-marquee var(--notice-scroll-duration, 18s) linear infinite; }
+.notice-loss { color: #ff6262; text-shadow: 0 0 3px #ff3030, 0 0 9px rgba(255, 48, 48, 0.78); }
 
 @keyframes notice-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 

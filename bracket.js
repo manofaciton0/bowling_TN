@@ -223,7 +223,7 @@ function publishRoundResults(event) {
 
     const title = roundTitles[roundIndex] || `Round ${roundIndex + 1}`;
     const matches = round.map((match, matchIndex) => formatMatchResult(match, matchIndex));
-    activateNoticeBoard(`◆ ${title} 경기 결과 ◆   ${matches.join('   ◆   ')}`);
+    activateNoticeBoard(`◆ ${title} 경기 결과 ◆   ${matches.join('   ◆   ')}`, { highlightLosses: true });
 }
 
 function formatMatchResult(match, matchIndex) {
@@ -242,15 +242,19 @@ function formatTeamResult(match, slot) {
     const memberTotal = calculateMemberScoreTotal(memberScores);
     const savedTotal = String(match[`${slot}Score`] ?? '').trim();
     const total = memberTotal || savedTotal || '-';
-    const winnerMark = isSameTeam(team, match.winner) ? ' [승]' : '';
+    const winnerMark = isSameTeam(team, match.winner)
+        ? ' [승]'
+        : (match.winner ? ' [패]' : '');
 
     return `${team.name}${winnerMark} (${memberText} / 합계 ${total})`;
 }
 
-function activateNoticeBoard(message) {
+function activateNoticeBoard(message, options = {}) {
     const board = document.getElementById('notice-board');
     const text = document.getElementById('notice-text');
-    if (text) text.textContent = message;
+    if (text) {
+        renderNoticeMessage(text, message, options);
+    }
     board?.classList.remove('is-active');
     void board?.offsetWidth;
     board?.classList.add('is-active');
@@ -260,6 +264,25 @@ function activateNoticeBoard(message) {
     }
     const stopButton = document.getElementById('btn-notice-stop');
     if (stopButton) stopButton.disabled = false;
+}
+
+function renderNoticeMessage(container, message, options = {}) {
+    container.textContent = '';
+    if (!options.highlightLosses) {
+        container.textContent = message;
+        return;
+    }
+
+    String(message).split(/(\[패\])/g).forEach(part => {
+        if (part === '[패]') {
+            const lossMark = document.createElement('span');
+            lossMark.className = 'notice-loss';
+            lossMark.textContent = part;
+            container.appendChild(lossMark);
+            return;
+        }
+        container.appendChild(document.createTextNode(part));
+    });
 }
 
 function stopNotice() {
@@ -275,7 +298,7 @@ function stopNotice() {
 let bracketState = [];
 let tournamentPlayers = [];
 let expandedSidebarTeamName = null;
-const DEFAULT_NOTICE_SCROLL_SPEED = 100;
+const DEFAULT_NOTICE_SCROLL_SPEED = 200;
 const NOTICE_SPEED_STORAGE_KEY = 'bowling_notice_scroll_speed';
 let noticeScrollSpeed = DEFAULT_NOTICE_SCROLL_SPEED;
 
