@@ -273,7 +273,14 @@ function renderNoticeMessage(container, message, options = {}) {
         return;
     }
 
-    String(message).split(/(\[패\])/g).forEach(part => {
+    String(message).split(/(\[승\]|\[패\])/g).forEach(part => {
+        if (part === '[승]') {
+            const winMark = document.createElement('span');
+            winMark.className = 'notice-win';
+            winMark.textContent = part;
+            container.appendChild(winMark);
+            return;
+        }
         if (part === '[패]') {
             const lossMark = document.createElement('span');
             lossMark.className = 'notice-loss';
