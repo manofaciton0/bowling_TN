@@ -329,6 +329,7 @@ body.nav-collapsed .notice-controls { top: 128px; }
 }
 
 .notice-start-btn { background: #ffffff; color: #047857; }
+.team-status-btn { background: #ffffff; color: #1d4ed8; border-color: rgba(37, 99, 235, 0.3); }
 .notice-stop-btn { background: #172019; color: #86efac; }
 .notice-control-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .notice-control-btn:disabled { opacity: 0.42; cursor: not-allowed; }

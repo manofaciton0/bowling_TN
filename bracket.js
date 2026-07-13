@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSidebarClose = document.getElementById('btn-sidebar-close');
     const teamSidebarOverlay = document.getElementById('team-sidebar-overlay');
     const btnNotice = document.getElementById('btn-notice');
+    const btnTeamStatus = document.getElementById('btn-team-status');
     const btnNoticeStop = document.getElementById('btn-notice-stop');
     const btnNoticeClose = document.getElementById('btn-notice-close');
     const noticeModalOverlay = document.getElementById('notice-modal-overlay');
@@ -62,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         teamSidebarOverlay.addEventListener('click', () => setTeamSidebarState(false));
     }
     btnNotice?.addEventListener('click', () => setNoticeModalState(true));
+    btnTeamStatus?.addEventListener('click', publishTeamStatus);
     btnNoticeStop?.addEventListener('click', stopNotice);
     btnNoticeClose?.addEventListener('click', () => setNoticeModalState(false));
     noticeModalOverlay?.addEventListener('click', () => setNoticeModalState(false));
@@ -208,6 +210,26 @@ function publishNotice(event) {
     if (roundResultSelect) roundResultSelect.value = '';
     activateNoticeBoard(message);
     setNoticeModalState(false);
+}
+
+function publishTeamStatus() {
+    const teams = normalizePlayers(tournamentPlayers);
+    if (teams.length === 0) {
+        showToast('표시할 팀원 정보가 없습니다.');
+        return;
+    }
+
+    const roundResultSelect = document.getElementById('round-result-select');
+    if (roundResultSelect) roundResultSelect.value = '';
+
+    const teamMessages = teams.map(team => {
+        const members = Array.isArray(team.members) && team.members.length > 0
+            ? team.members.join(' · ')
+            : '팀원 없음';
+        return `${team.name} (${members})`;
+    });
+
+    activateNoticeBoard(`◆ 팀원 현황 ◆   ${teamMessages.join('   ◆   ')}`);
 }
 
 function publishRoundResults(event) {
