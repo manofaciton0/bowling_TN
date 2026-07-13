@@ -18,9 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const noticeModalOverlay = document.getElementById('notice-modal-overlay');
     const noticeForm = document.getElementById('notice-form');
     const roundResultSelect = document.getElementById('round-result-select');
+    const btnSettings = document.getElementById('btn-settings');
+    const btnSettingsClose = document.getElementById('btn-settings-close');
+    const settingsModalOverlay = document.getElementById('settings-modal-overlay');
+    const speedInput = document.getElementById('notice-speed-input');
+    const defaultSpeedCheckbox = document.getElementById('use-default-speed');
 
     initializeTheme();
     initializeNavState();
+    initializeNoticeSpeedSettings();
 
     if (btnDownload) {
         btnDownload.addEventListener('click', downloadJSON);
@@ -61,6 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
     noticeModalOverlay?.addEventListener('click', () => setNoticeModalState(false));
     noticeForm?.addEventListener('submit', publishNotice);
     roundResultSelect?.addEventListener('change', publishRoundResults);
+    btnSettings?.addEventListener('click', () => setSettingsModalState(true));
+    btnSettingsClose?.addEventListener('click', () => setSettingsModalState(false));
+    settingsModalOverlay?.addEventListener('click', () => setSettingsModalState(false));
+    document.getElementById('btn-speed-decrease')?.addEventListener('click', () => changeNoticeSpeed(-10));
+    document.getElementById('btn-speed-increase')?.addEventListener('click', () => changeNoticeSpeed(10));
+    speedInput?.addEventListener('change', () => setNoticeSpeed(speedInput.value));
+    defaultSpeedCheckbox?.addEventListener('change', () => toggleDefaultNoticeSpeed(defaultSpeedCheckbox.checked));
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -68,12 +81,98 @@ document.addEventListener('DOMContentLoaded', () => {
             setHelpModalState(false);
             setTeamSidebarState(false);
             setNoticeModalState(false);
+            setSettingsModalState(false);
         }
     });
     document.addEventListener('click', closeMemberScoreEditors);
 
     window.addEventListener('resize', scheduleRenderBracketLines);
 });
+
+function initializeNoticeSpeedSettings() {
+    const savedSpeed = Number.parseInt(localStorage.getItem(NOTICE_SPEED_STORAGE_KEY), 10);
+    noticeScrollSpeed = normalizeNoticeSpeed(savedSpeed || DEFAULT_NOTICE_SCROLL_SPEED);
+    updateNoticeSpeedControls(noticeScrollSpeed === DEFAULT_NOTICE_SCROLL_SPEED);
+}
+
+function setSettingsModalState(open) {
+    const modal = document.getElementById('settings-modal');
+    const overlay = document.getElementById('settings-modal-overlay');
+    const button = document.getElementById('btn-settings');
+    const closeButton = document.getElementById('btn-settings-close');
+    const wasOpen = document.body.classList.contains('settings-modal-open');
+
+    if (!open && !wasOpen) return;
+
+    document.body.classList.toggle('settings-modal-open', open);
+    modal?.setAttribute('aria-hidden', String(!open));
+    overlay?.setAttribute('aria-hidden', String(!open));
+    button?.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+        closeButton?.focus();
+    } else if (wasOpen) {
+        button?.focus();
+    }
+}
+
+function normalizeNoticeSpeed(value) {
+    const numericValue = Number.parseInt(value, 10);
+    if (Number.isNaN(numericValue)) return DEFAULT_NOTICE_SCROLL_SPEED;
+    return Math.min(300, Math.max(10, numericValue));
+}
+
+function setNoticeSpeed(value) {
+    noticeScrollSpeed = normalizeNoticeSpeed(value);
+    localStorage.setItem(NOTICE_SPEED_STORAGE_KEY, String(noticeScrollSpeed));
+    updateNoticeSpeedControls(false);
+    refreshActiveNoticeSpeed();
+}
+
+function changeNoticeSpeed(change) {
+    setNoticeSpeed(noticeScrollSpeed + change);
+}
+
+function toggleDefaultNoticeSpeed(useDefault) {
+    if (useDefault) {
+        noticeScrollSpeed = DEFAULT_NOTICE_SCROLL_SPEED;
+        localStorage.removeItem(NOTICE_SPEED_STORAGE_KEY);
+        updateNoticeSpeedControls(true);
+        refreshActiveNoticeSpeed();
+        return;
+    }
+
+    updateNoticeSpeedControls(false);
+}
+
+function updateNoticeSpeedControls(useDefault) {
+    const input = document.getElementById('notice-speed-input');
+    const checkbox = document.getElementById('use-default-speed');
+    const decreaseButton = document.getElementById('btn-speed-decrease');
+    const increaseButton = document.getElementById('btn-speed-increase');
+
+    if (input) {
+        input.value = String(noticeScrollSpeed);
+        input.disabled = useDefault;
+    }
+    if (checkbox) checkbox.checked = useDefault;
+    if (decreaseButton) decreaseButton.disabled = useDefault;
+    if (increaseButton) increaseButton.disabled = useDefault;
+}
+
+function refreshActiveNoticeSpeed() {
+    const board = document.getElementById('notice-board');
+    const text = document.getElementById('notice-text');
+    if (!board?.classList.contains('is-active') || !text) return;
+
+    applyNoticeScrollDuration(text);
+}
+
+function applyNoticeScrollDuration(text) {
+    const travelDistance = text.getBoundingClientRect().width;
+    const duration = Math.max(travelDistance / noticeScrollSpeed, 8);
+    text.style.setProperty('--notice-scroll-duration', `${duration.toFixed(2)}s`);
+}
 
 function setNoticeModalState(open) {
     const modal = document.getElementById('notice-modal');
@@ -157,9 +256,7 @@ function activateNoticeBoard(message) {
     board?.classList.add('is-active');
     board?.setAttribute('aria-hidden', 'false');
     if (board && text) {
-        const travelDistance = text.getBoundingClientRect().width;
-        const duration = Math.max(travelDistance / NOTICE_SCROLL_SPEED, 8);
-        text.style.setProperty('--notice-scroll-duration', `${duration.toFixed(2)}s`);
+        applyNoticeScrollDuration(text);
     }
     const stopButton = document.getElementById('btn-notice-stop');
     if (stopButton) stopButton.disabled = false;
@@ -178,7 +275,9 @@ function stopNotice() {
 let bracketState = [];
 let tournamentPlayers = [];
 let expandedSidebarTeamName = null;
-const NOTICE_SCROLL_SPEED = 100;
+const DEFAULT_NOTICE_SCROLL_SPEED = 100;
+const NOTICE_SPEED_STORAGE_KEY = 'bowling_notice_scroll_speed';
+let noticeScrollSpeed = DEFAULT_NOTICE_SCROLL_SPEED;
 
 const pageTournamentConfig = window.BOWLING_BRACKET_CONFIG || {};
 const pageFormatConfig = pageTournamentConfig.format || {};

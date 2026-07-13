@@ -24,6 +24,7 @@
                 <button id="btn-restore" class="action-btn" type="button">📤 대진 복원</button>
                 <button id="btn-reset" class="action-btn reset-btn" type="button">🔄 초기화</button>
                 <button id="btn-theme" class="action-btn theme-btn" type="button">어두운 테마</button>
+                <button id="btn-settings" class="action-btn settings-btn" type="button" aria-controls="settings-modal" aria-expanded="false">⚙ 설정</button>
             </div>
         </div>
     </nav>
@@ -94,6 +95,30 @@
         <div class="notice-led-grid" aria-hidden="true"></div>
         <div class="notice-track"><span id="notice-text" class="notice-text"></span></div>
     </div>
+
+    <div id="settings-modal-overlay" class="settings-modal-overlay" aria-hidden="true"></div>
+    <section id="settings-modal" class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" aria-hidden="true">
+        <div class="settings-modal-header">
+            <div>
+                <p>전광판 표시 설정</p>
+                <h2 id="settings-modal-title">설정</h2>
+            </div>
+            <button id="btn-settings-close" class="settings-modal-close" type="button" aria-label="설정 닫기">×</button>
+        </div>
+        <div class="settings-modal-body">
+            <label for="notice-speed-input">공지 흐르는 속도</label>
+            <div class="speed-stepper">
+                <button id="btn-speed-decrease" type="button" aria-label="속도 줄이기">−</button>
+                <input id="notice-speed-input" type="number" min="10" max="300" step="10" value="100" inputmode="numeric">
+                <span>px/s</span>
+                <button id="btn-speed-increase" type="button" aria-label="속도 높이기">+</button>
+            </div>
+            <label class="default-speed-option" for="use-default-speed">
+                <input id="use-default-speed" type="checkbox" checked>
+                <span>기본값 사용 (100px/s)</span>
+            </label>
+        </div>
+    </section>
 
     <div id="help-modal-overlay" class="help-modal-overlay" aria-hidden="true"></div>
     <section id="help-modal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" aria-hidden="true">
