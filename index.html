@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>볼링대회 18팀 토너먼트 대진표</title>
+    <link rel="preload" href="fonts/x12y12pxMaruMinyaHangul.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="bracket-style.css">
 </head>
 <body class="theme-light">
@@ -30,6 +31,23 @@
     <button id="btn-sidebar-toggle" class="team-sidebar-toggle" type="button" aria-controls="team-sidebar" aria-expanded="false">
         팀 목록
     </button>
+
+    <div class="notice-controls" aria-label="공지사항 제어">
+        <button id="btn-notice" class="notice-control-btn notice-start-btn" type="button" aria-controls="notice-modal" aria-expanded="false">
+            <span aria-hidden="true">📢</span> 공지
+        </button>
+        <label class="round-result-label" for="round-result-select">경기 결과</label>
+        <select id="round-result-select" class="round-result-select">
+            <option value="">라운드 선택</option>
+            <option value="0">예선 12강</option>
+            <option value="1">본선 12강</option>
+            <option value="2">본선 6강</option>
+            <option value="3">결승</option>
+        </select>
+        <button id="btn-notice-stop" class="notice-control-btn notice-stop-btn" type="button" disabled>
+            <span aria-hidden="true">⏹</span> 공지 정지
+        </button>
+    </div>
 
     <div id="team-sidebar-overlay" class="team-sidebar-overlay" aria-hidden="true"></div>
 
@@ -58,6 +76,24 @@
 
     <!-- 에러/CORS 경고 표시용 토스트 메시지 -->
     <div id="toast"></div>
+
+    <div id="notice-modal-overlay" class="notice-modal-overlay" aria-hidden="true"></div>
+    <section id="notice-modal" class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="notice-modal-title" aria-hidden="true">
+        <div class="notice-modal-header">
+            <h2 id="notice-modal-title">공지사항 입력</h2>
+            <button id="btn-notice-close" class="notice-modal-close" type="button" aria-label="공지 입력 닫기">×</button>
+        </div>
+        <form id="notice-form" class="notice-form">
+            <label for="notice-input">전광판에 표시할 내용</label>
+            <textarea id="notice-input" rows="4" maxlength="200" placeholder="공지 내용을 입력하세요" required></textarea>
+            <button class="notice-submit-btn" type="submit">입력 완료</button>
+        </form>
+    </section>
+
+    <div id="notice-board" class="notice-board" role="status" aria-live="polite" aria-hidden="true">
+        <div class="notice-led-grid" aria-hidden="true"></div>
+        <div class="notice-track"><span id="notice-text" class="notice-text"></span></div>
+    </div>
 
     <div id="help-modal-overlay" class="help-modal-overlay" aria-hidden="true"></div>
     <section id="help-modal" class="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" aria-hidden="true">

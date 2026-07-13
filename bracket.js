@@ -12,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
     const btnSidebarClose = document.getElementById('btn-sidebar-close');
     const teamSidebarOverlay = document.getElementById('team-sidebar-overlay');
+    const btnNotice = document.getElementById('btn-notice');
+    const btnNoticeStop = document.getElementById('btn-notice-stop');
+    const btnNoticeClose = document.getElementById('btn-notice-close');
+    const noticeModalOverlay = document.getElementById('notice-modal-overlay');
+    const noticeForm = document.getElementById('notice-form');
+    const roundResultSelect = document.getElementById('round-result-select');
 
     initializeTheme();
     initializeNavState();
@@ -49,12 +55,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (teamSidebarOverlay) {
         teamSidebarOverlay.addEventListener('click', () => setTeamSidebarState(false));
     }
+    btnNotice?.addEventListener('click', () => setNoticeModalState(true));
+    btnNoticeStop?.addEventListener('click', stopNotice);
+    btnNoticeClose?.addEventListener('click', () => setNoticeModalState(false));
+    noticeModalOverlay?.addEventListener('click', () => setNoticeModalState(false));
+    noticeForm?.addEventListener('submit', publishNotice);
+    roundResultSelect?.addEventListener('change', publishRoundResults);
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             closeMemberScoreEditors();
             setHelpModalState(false);
             setTeamSidebarState(false);
+            setNoticeModalState(false);
         }
     });
     document.addEventListener('click', closeMemberScoreEditors);
@@ -62,9 +75,110 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', scheduleRenderBracketLines);
 });
 
+function setNoticeModalState(open) {
+    const modal = document.getElementById('notice-modal');
+    const overlay = document.getElementById('notice-modal-overlay');
+    const button = document.getElementById('btn-notice');
+    const input = document.getElementById('notice-input');
+    const wasOpen = document.body.classList.contains('notice-modal-open');
+
+    if (!open && !wasOpen) return;
+
+    document.body.classList.toggle('notice-modal-open', open);
+    modal?.setAttribute('aria-hidden', String(!open));
+    overlay?.setAttribute('aria-hidden', String(!open));
+    button?.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+        window.setTimeout(() => input?.focus(), 50);
+    } else if (wasOpen) {
+        button?.focus();
+    }
+}
+
+function publishNotice(event) {
+    event.preventDefault();
+    const input = document.getElementById('notice-input');
+    const message = input?.value.trim();
+    if (!message) {
+        input?.focus();
+        return;
+    }
+
+    const roundResultSelect = document.getElementById('round-result-select');
+    if (roundResultSelect) roundResultSelect.value = '';
+    activateNoticeBoard(message);
+    setNoticeModalState(false);
+}
+
+function publishRoundResults(event) {
+    const select = event.currentTarget;
+    const roundIndex = Number.parseInt(select.value, 10);
+    if (Number.isNaN(roundIndex)) return;
+
+    const round = bracketState[roundIndex];
+    if (!Array.isArray(round) || round.length === 0) {
+        showToast('선택한 라운드의 경기 결과가 없습니다.');
+        return;
+    }
+
+    const title = roundTitles[roundIndex] || `Round ${roundIndex + 1}`;
+    const matches = round.map((match, matchIndex) => formatMatchResult(match, matchIndex));
+    activateNoticeBoard(`◆ ${title} 경기 결과 ◆   ${matches.join('   ◆   ')}`);
+}
+
+function formatMatchResult(match, matchIndex) {
+    const teams = getMatchSlots(match).map(slot => formatTeamResult(match, slot));
+    return `${matchIndex + 1}경기  ${teams.join('  VS  ')}`;
+}
+
+function formatTeamResult(match, slot) {
+    const team = match[slot];
+    if (!team) return '대기중';
+
+    const memberScores = getSlotMemberScores(match, slot, team);
+    const memberText = getScoreMembers(team)
+        .map((member, index) => `${member} ${memberScores[index] || '-'}`)
+        .join(' · ');
+    const memberTotal = calculateMemberScoreTotal(memberScores);
+    const savedTotal = String(match[`${slot}Score`] ?? '').trim();
+    const total = memberTotal || savedTotal || '-';
+    const winnerMark = isSameTeam(team, match.winner) ? ' [승]' : '';
+
+    return `${team.name}${winnerMark} (${memberText} / 합계 ${total})`;
+}
+
+function activateNoticeBoard(message) {
+    const board = document.getElementById('notice-board');
+    const text = document.getElementById('notice-text');
+    if (text) text.textContent = message;
+    board?.classList.remove('is-active');
+    void board?.offsetWidth;
+    board?.classList.add('is-active');
+    board?.setAttribute('aria-hidden', 'false');
+    if (board && text) {
+        const travelDistance = text.getBoundingClientRect().width;
+        const duration = Math.max(travelDistance / NOTICE_SCROLL_SPEED, 8);
+        text.style.setProperty('--notice-scroll-duration', `${duration.toFixed(2)}s`);
+    }
+    const stopButton = document.getElementById('btn-notice-stop');
+    if (stopButton) stopButton.disabled = false;
+}
+
+function stopNotice() {
+    const board = document.getElementById('notice-board');
+    board?.classList.remove('is-active');
+    board?.setAttribute('aria-hidden', 'true');
+    const stopButton = document.getElementById('btn-notice-stop');
+    if (stopButton) stopButton.disabled = true;
+    const roundResultSelect = document.getElementById('round-result-select');
+    if (roundResultSelect) roundResultSelect.value = '';
+}
+
 let bracketState = [];
 let tournamentPlayers = [];
 let expandedSidebarTeamName = null;
+const NOTICE_SCROLL_SPEED = 100;
 
 const pageTournamentConfig = window.BOWLING_BRACKET_CONFIG || {};
 const pageFormatConfig = pageTournamentConfig.format || {};
