@@ -1219,7 +1219,7 @@ body.help-modal-open .help-modal {
         border-radius: 8px;
         background: rgba(245, 158, 11, 0.12);
         color: var(--text-primary);
-        font-size: 1rem;
+        font-size: 1.08rem;
         font-weight: 900;
         text-align: center;
     }
@@ -1263,19 +1263,19 @@ body.help-modal-open .help-modal {
 
     .mobile-placement span {
         margin-bottom: 3px;
-        font-size: 0.58rem;
+        font-size: 0.68rem;
         font-weight: 900;
     }
 
     .mobile-placement strong {
-        font-size: 0.7rem;
+        font-size: 0.8rem;
         line-height: 1.2;
     }
 
     .mobile-placement-members {
         margin-top: 5px;
         color: var(--text-secondary);
-        font-size: 0.55rem;
+        font-size: 0.62rem;
         font-weight: 600;
         line-height: 1.35;
         overflow-wrap: anywhere;
@@ -1283,7 +1283,7 @@ body.help-modal-open .help-modal {
 
     .mobile-champion .mobile-placement-members {
         margin-top: 6px;
-        font-size: 0.65rem;
+        font-size: 0.72rem;
     }
 
     .mobile-placement-2 { border-color: var(--runner-up-border); background: var(--runner-up-bg); }
@@ -1302,7 +1302,7 @@ body.help-modal-open .help-modal {
         margin: 0 0 8px;
         padding: 0 2px;
         color: var(--text-primary);
-        font-size: 0.82rem;
+        font-size: 0.92rem;
         line-height: 1.2;
     }
 
@@ -1325,7 +1325,7 @@ body.help-modal-open .help-modal {
         border-bottom: 1px solid var(--match-border);
         background: var(--pill-bg);
         color: var(--text-secondary);
-        font-size: 0.58rem;
+        font-size: 0.66rem;
         font-weight: 800;
     }
 
@@ -1352,7 +1352,7 @@ body.help-modal-open .help-modal {
         display: flex;
         align-items: center;
         color: var(--text-secondary);
-        font-size: 0.65rem;
+        font-size: 0.72rem;
         font-weight: 700;
     }
 
@@ -1368,7 +1368,7 @@ body.help-modal-open .help-modal {
     .mobile-team-header strong {
         min-width: 0;
         overflow: hidden;
-        font-size: 0.72rem;
+        font-size: 0.82rem;
         line-height: 1.15;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1377,7 +1377,7 @@ body.help-modal-open .help-modal {
     .mobile-team-header span {
         flex: 0 0 auto;
         color: var(--text-secondary);
-        font-size: 0.58rem;
+        font-size: 0.68rem;
         font-weight: 800;
     }
 
@@ -1391,7 +1391,7 @@ body.help-modal-open .help-modal {
         min-width: 0;
         overflow: hidden;
         color: var(--text-secondary);
-        font-size: 0.56rem;
+        font-size: 0.64rem;
         line-height: 1.25;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1915,6 +1915,24 @@ body.help-modal-open .help-modal {
 .member-score-total strong {
     color: var(--text-primary);
     font-size: 1rem;
+}
+
+.member-score-submit {
+    width: 100%;
+    margin-top: 10px;
+    border: 0;
+    border-radius: 6px;
+    padding: 9px 12px;
+    background: #059669;
+    color: #ffffff;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.member-score-submit:hover {
+    background: #047857;
 }
 
 .player:hover:not(.empty):not(.champion) {

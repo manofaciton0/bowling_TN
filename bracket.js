@@ -2438,17 +2438,6 @@ function createMemberScoreEditor(playerObj, memberScores, fallbackTotal, onScore
 
                 const total = calculateMemberScoreTotal(scores);
                 totalValue.textContent = total || '-';
-                onScoresChange([...scores], total);
-            });
-        }
-
-        if (refreshOnClose && canEdit) {
-            input.addEventListener('blur', () => {
-                window.setTimeout(() => {
-                    if (!editor.contains(document.activeElement)) {
-                        renderBracket();
-                    }
-                }, 0);
             });
         }
 
@@ -2468,6 +2457,23 @@ function createMemberScoreEditor(playerObj, memberScores, fallbackTotal, onScore
     totalRow.appendChild(totalValue);
 
     editor.appendChild(totalRow);
+
+    if (canEdit) {
+        const submitButton = document.createElement('button');
+        submitButton.type = 'button';
+        submitButton.className = 'member-score-submit';
+        submitButton.textContent = '입력';
+        submitButton.addEventListener('click', () => {
+            const total = calculateMemberScoreTotal(scores);
+            onScoresChange([...scores], total);
+            if (refreshOnClose) {
+                renderBracket();
+            } else {
+                closeMemberScoreEditors();
+            }
+        });
+        editor.appendChild(submitButton);
+    }
 
     return editor;
 }
