@@ -89,7 +89,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', closeMemberScoreEditors);
 
     const bracketContainer = document.getElementById('bracket-container');
-    bracketContainer?.addEventListener('dblclick', handleMobileBracketDoubleTap);
+    bracketContainer?.addEventListener('gesturestart', preventMobileBracketPinch, { passive: false });
+    bracketContainer?.addEventListener('gesturechange', preventMobileBracketPinch, { passive: false });
+    document.getElementById('btn-mobile-zoom-out')?.addEventListener('click', () => setMobileBracketOverview(true));
+    document.getElementById('btn-mobile-zoom-in')?.addEventListener('click', () => setMobileBracketOverview(false));
     window.addEventListener('resize', handleBracketViewportResize);
 });
 
@@ -98,13 +101,16 @@ function handleBracketViewportResize() {
     scheduleMobileBracketView();
 }
 
-function handleMobileBracketDoubleTap(event) {
+function setMobileBracketOverview(overview) {
     if (!window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) return;
-    if (!mobileBracketOverview && event.target.closest('button, input, .player, .member-score-popover')) return;
-
-    event.preventDefault();
-    mobileBracketOverview = !mobileBracketOverview;
+    mobileBracketOverview = overview;
     applyMobileBracketView();
+}
+
+function preventMobileBracketPinch(event) {
+    if (window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) {
+        event.preventDefault();
+    }
 }
 
 function scheduleMobileBracketView() {
@@ -124,6 +130,7 @@ function applyMobileBracketView() {
         document.body.classList.remove('mobile-bracket-overview');
         stage.style.removeProperty('--mobile-bracket-scale');
         container.style.removeProperty('--mobile-bracket-height');
+        updateMobileZoomControls(isMobile);
         return;
     }
 
@@ -142,6 +149,14 @@ function applyMobileBracketView() {
     container.style.setProperty('--mobile-bracket-height', `${Math.ceil(stageHeight * scale + verticalPadding)}px`);
     container.scrollLeft = 0;
     document.body.classList.add('mobile-bracket-overview');
+    updateMobileZoomControls(true);
+}
+
+function updateMobileZoomControls(isMobile) {
+    const zoomOutButton = document.getElementById('btn-mobile-zoom-out');
+    const zoomInButton = document.getElementById('btn-mobile-zoom-in');
+    if (zoomOutButton) zoomOutButton.disabled = !isMobile || mobileBracketOverview;
+    if (zoomInButton) zoomInButton.disabled = !isMobile || !mobileBracketOverview;
 }
 
 function initializeNoticeSpeedSettings() {
