@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSidebarToggle = document.getElementById('btn-sidebar-toggle');
     const btnSidebarClose = document.getElementById('btn-sidebar-close');
     const teamSidebarOverlay = document.getElementById('team-sidebar-overlay');
+    const teamSidebarSearchInput = document.getElementById('team-sidebar-search-input');
     const btnNotice = document.getElementById('btn-notice');
     const btnTeamStatus = document.getElementById('btn-team-status');
     const btnNoticeStop = document.getElementById('btn-notice-stop');
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (teamSidebarOverlay) {
         teamSidebarOverlay.addEventListener('click', () => setTeamSidebarState(false));
     }
+    teamSidebarSearchInput?.addEventListener('input', renderTeamSidebar);
     btnNotice?.addEventListener('click', () => setNoticeModalState(true));
     btnTeamStatus?.addEventListener('click', publishTeamStatus);
     btnNoticeStop?.addEventListener('click', stopNotice);
@@ -1763,13 +1765,35 @@ function renderTeamSidebar() {
     if (!list) return;
 
     const players = normalizePlayers(tournamentPlayers);
+    const searchInput = document.getElementById('team-sidebar-search-input');
+    const query = String(searchInput?.value || '').trim().toLocaleLowerCase('ko-KR');
+    const filteredPlayers = players
+        .map((team, index) => ({ team, index }))
+        .filter(({ team }) => {
+            if (!query) return true;
+            const teamNameMatches = String(team.name || '').toLocaleLowerCase('ko-KR').includes(query);
+            const memberMatches = Array.isArray(team.members) && team.members.some(member => (
+                String(member).toLocaleLowerCase('ko-KR').includes(query)
+            ));
+            return teamNameMatches || memberMatches;
+        });
     list.innerHTML = '';
 
     if (count) {
-        count.textContent = `${players.length}팀`;
+        count.textContent = query
+            ? `${filteredPlayers.length}/${players.length}팀`
+            : `${players.length}팀`;
     }
 
-    players.forEach((team, index) => {
+    if (filteredPlayers.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'team-sidebar-no-results';
+        empty.textContent = '검색 결과가 없습니다.';
+        list.appendChild(empty);
+        return;
+    }
+
+    filteredPlayers.forEach(({ team, index }) => {
         const card = document.createElement('article');
         card.className = 'team-sidebar-card';
 

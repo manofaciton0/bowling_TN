@@ -619,6 +619,11 @@ body.team-sidebar-open .team-sidebar {
     border-bottom: 1px solid var(--topbar-border);
 }
 
+.team-sidebar-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .team-sidebar-kicker {
     margin: 0 0 6px;
     color: var(--text-secondary);
@@ -631,6 +636,34 @@ body.team-sidebar-open .team-sidebar {
     margin: 0;
     font-size: 1.45rem;
     line-height: 1.25;
+}
+
+.team-sidebar-search {
+    display: block;
+    margin-top: 14px;
+}
+
+.team-sidebar-search input {
+    width: 100%;
+    height: 40px;
+    box-sizing: border-box;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 0 12px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.team-sidebar-search input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+    outline: none;
+}
+
+.team-sidebar-search input::placeholder {
+    color: var(--text-secondary);
 }
 
 .team-sidebar-close {
@@ -674,6 +707,14 @@ body.team-sidebar-open .team-sidebar {
 .team-sidebar-list {
     display: grid;
     gap: 10px;
+}
+
+.team-sidebar-no-results {
+    margin: 18px 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
 }
 
 .team-sidebar-card {
@@ -1385,6 +1426,7 @@ body.help-modal-open .help-modal {
         min-width: 0;
         overflow: hidden;
         font-size: 1.3rem;
+        font-weight: 400;
         line-height: 1.15;
         text-overflow: ellipsis;
         white-space: nowrap;

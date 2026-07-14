@@ -58,9 +58,12 @@
 
     <aside id="team-sidebar" class="team-sidebar" aria-hidden="true" aria-label="전체 팀과 팀원 목록">
         <div class="team-sidebar-header">
-            <div>
+            <div class="team-sidebar-heading">
                 <p class="team-sidebar-kicker">참가팀</p>
                 <h2>전체 팀 목록</h2>
+                <label class="team-sidebar-search" for="team-sidebar-search-input">
+                    <input id="team-sidebar-search-input" type="search" aria-label="팀명 또는 팀원 이름 검색" placeholder="팀명 또는 팀원 검색" autocomplete="off">
+                </label>
             </div>
             <button id="btn-sidebar-close" class="team-sidebar-close" type="button" aria-label="팀 목록 닫기">×</button>
         </div>
