@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     fetchData();
+    initializeSupabaseTournamentState();
 
     const btnDownload = document.getElementById('btn-download');
     const btnRestore = document.getElementById('btn-restore');
@@ -24,10 +25,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsModalOverlay = document.getElementById('settings-modal-overlay');
     const speedInput = document.getElementById('notice-speed-input');
     const defaultSpeedCheckbox = document.getElementById('use-default-speed');
+    const btnAdminAuth = document.getElementById('btn-admin-auth');
+    const btnAdminClose = document.getElementById('btn-admin-close');
+    const adminModalOverlay = document.getElementById('admin-modal-overlay');
+    const adminLoginForm = document.getElementById('admin-login-form');
 
     initializeTheme();
     initializeNavState();
     initializeNoticeSpeedSettings();
+    initializeAdminAuth();
 
     if (btnDownload) {
         btnDownload.addEventListener('click', downloadJSON);
@@ -76,6 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-speed-increase')?.addEventListener('click', () => changeNoticeSpeed(10));
     speedInput?.addEventListener('change', () => setNoticeSpeed(speedInput.value));
     defaultSpeedCheckbox?.addEventListener('change', () => toggleDefaultNoticeSpeed(defaultSpeedCheckbox.checked));
+    btnAdminAuth?.addEventListener('click', handleAdminAuthButton);
+    btnAdminClose?.addEventListener('click', () => setAdminModalState(false));
+    adminModalOverlay?.addEventListener('click', () => setAdminModalState(false));
+    adminLoginForm?.addEventListener('submit', submitAdminLogin);
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -84,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTeamSidebarState(false);
             setNoticeModalState(false);
             setSettingsModalState(false);
+            setAdminModalState(false);
         }
     });
     document.addEventListener('click', closeMemberScoreEditors);
@@ -96,19 +107,401 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', handleBracketViewportResize);
 });
 
+async function initializeAdminAuth() {
+    if (!bowlingSupabaseClient) {
+        updateAdminAuthUi(null, 'Supabase 연결 실패');
+        return;
+    }
+
+    const { data, error } = await bowlingSupabaseClient.auth.getSession();
+    if (error) {
+        console.error('관리자 세션 확인 실패:', error);
+        updateAdminAuthUi(null);
+    } else if (data.session?.user) {
+        const isAdmin = await validateAndApplyAdminSession(data.session.user);
+        if (!isAdmin) {
+            await bowlingSupabaseClient.auth.signOut();
+        } else {
+            await ensureRemoteTournamentStateInitialized();
+        }
+    } else {
+        updateAdminAuthUi(null);
+    }
+
+    bowlingSupabaseClient.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT' || !session?.user) {
+            updateAdminAuthUi(null);
+        }
+    });
+}
+
+async function handleAdminAuthButton() {
+    if (currentAdminUser) {
+        await bowlingSupabaseClient?.auth.signOut();
+        updateAdminAuthUi(null);
+        showToast('관리자 로그아웃이 완료되었습니다.');
+        return;
+    }
+
+    setAdminModalState(true);
+}
+
+function setAdminModalState(open) {
+    const modal = document.getElementById('admin-modal');
+    const overlay = document.getElementById('admin-modal-overlay');
+    const button = document.getElementById('btn-admin-auth');
+    const emailInput = document.getElementById('admin-email');
+    const passwordInput = document.getElementById('admin-password');
+    const wasOpen = document.body.classList.contains('admin-modal-open');
+
+    if (!open && !wasOpen) return;
+
+    document.body.classList.toggle('admin-modal-open', open);
+    modal?.setAttribute('aria-hidden', String(!open));
+    overlay?.setAttribute('aria-hidden', String(!open));
+    button?.setAttribute('aria-expanded', String(open));
+
+    if (open) {
+        setAdminAuthMessage('');
+        window.setTimeout(() => emailInput?.focus(), 50);
+    } else if (wasOpen) {
+        if (passwordInput) passwordInput.value = '';
+        button?.focus();
+    }
+}
+
+async function submitAdminLogin(event) {
+    event.preventDefault();
+    if (!bowlingSupabaseClient) {
+        setAdminAuthMessage('Supabase에 연결할 수 없습니다.', true);
+        return;
+    }
+
+    const emailInput = document.getElementById('admin-email');
+    const passwordInput = document.getElementById('admin-password');
+    const submitButton = document.getElementById('btn-admin-submit');
+    const email = emailInput?.value.trim();
+    const password = passwordInput?.value || '';
+    if (!email || !password) return;
+
+    if (submitButton) submitButton.disabled = true;
+    setAdminAuthMessage('로그인 확인 중...');
+
+    try {
+        const { data, error } = await bowlingSupabaseClient.auth.signInWithPassword({ email, password });
+        if (error || !data.user) {
+            throw error || new Error('로그인 정보를 확인할 수 없습니다.');
+        }
+
+        const isAdmin = await validateAndApplyAdminSession(data.user);
+        if (!isAdmin) {
+            await bowlingSupabaseClient.auth.signOut();
+            setAdminAuthMessage('관리자로 등록되지 않은 계정입니다.', true);
+            return;
+        }
+
+        await ensureRemoteTournamentStateInitialized();
+        setAdminModalState(false);
+        showToast('관리자 로그인에 성공했습니다.');
+    } catch (error) {
+        console.error('관리자 로그인 실패:', error);
+        setAdminAuthMessage('아이디 또는 비밀번호를 확인해 주세요.', true);
+    } finally {
+        if (submitButton) submitButton.disabled = false;
+    }
+}
+
+async function validateAndApplyAdminSession(user) {
+    const { data, error } = await bowlingSupabaseClient
+        .from('admin_users')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (error) {
+        console.error('관리자 권한 확인 실패:', error);
+        updateAdminAuthUi(null);
+        return false;
+    }
+
+    const isAdmin = Boolean(data?.user_id);
+    updateAdminAuthUi(isAdmin ? user : null);
+    return isAdmin;
+}
+
+function updateAdminAuthUi(user, unavailableLabel = '') {
+    const wasAdmin = Boolean(currentAdminUser);
+    currentAdminUser = user || null;
+    document.body.classList.toggle('admin-authenticated', Boolean(currentAdminUser));
+    document.body.classList.toggle('admin-read-only', !currentAdminUser);
+
+    const button = document.getElementById('btn-admin-auth');
+    if (!button) return;
+    button.classList.toggle('is-authenticated', Boolean(currentAdminUser));
+    button.textContent = currentAdminUser
+        ? '🔓 관리자 로그아웃'
+        : (unavailableLabel || '🔐 관리자 로그인');
+    button.disabled = Boolean(unavailableLabel);
+
+    updateAdminAccessUi();
+    if (wasAdmin !== Boolean(currentAdminUser) && bracketState.length > 0) {
+        closeMemberScoreEditors();
+        renderBracket();
+    }
+}
+
+function isAdminAuthenticated() {
+    return Boolean(currentAdminUser);
+}
+
+function requireAdminAccess(action = '수정') {
+    if (isAdminAuthenticated()) return true;
+
+    showToast(`${action}은(는) 관리자 로그인 후 사용할 수 있습니다.`);
+    setAdminModalState(true);
+    return false;
+}
+
+function updateAdminAccessUi() {
+    const readOnly = !isAdminAuthenticated();
+    const adminControls = [
+        'btn-restore',
+        'btn-reset',
+        'btn-notice',
+        'btn-team-status',
+        'round-result-select',
+        'notice-input',
+        'btn-admin-submit'
+    ];
+
+    adminControls.forEach(id => {
+        const control = document.getElementById(id);
+        if (!control) return;
+        if (id !== 'btn-admin-submit') control.disabled = readOnly;
+        if (id !== 'btn-admin-submit') {
+            control.title = readOnly ? '관리자 로그인 후 사용할 수 있습니다.' : '';
+        }
+    });
+
+    const noticeSubmit = document.querySelector('.notice-submit-btn');
+    if (noticeSubmit) noticeSubmit.disabled = readOnly;
+
+    const bracketContainer = document.getElementById('bracket-container');
+    bracketContainer?.setAttribute('aria-readonly', String(readOnly));
+    syncNoticeStopButton();
+}
+
+function syncNoticeStopButton() {
+    const stopButton = document.getElementById('btn-notice-stop');
+    const board = document.getElementById('notice-board');
+    if (!stopButton) return;
+    stopButton.disabled = !isAdminAuthenticated() || !board?.classList.contains('is-active');
+    stopButton.title = isAdminAuthenticated() ? '' : '관리자 로그인 후 사용할 수 있습니다.';
+}
+
+function setAdminAuthMessage(message, isError = false) {
+    const messageElement = document.getElementById('admin-auth-message');
+    if (!messageElement) return;
+    messageElement.textContent = message;
+    messageElement.classList.toggle('is-error', isError);
+}
+
+function initializeSupabaseTournamentState() {
+    if (!bowlingSupabaseClient) return;
+
+    subscribeToTournamentState();
+    remoteStateLoadPromise = loadRemoteTournamentState();
+}
+
+function subscribeToTournamentState() {
+    if (tournamentStateChannel || !bowlingSupabaseClient) return;
+
+    tournamentStateChannel = bowlingSupabaseClient
+        .channel(`tournament-state-${SUPABASE_TOURNAMENT_ID}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'tournament_state',
+                filter: `id=eq.${SUPABASE_TOURNAMENT_ID}`
+            },
+            payload => applyRemoteTournamentState(payload.new)
+        )
+        .subscribe(status => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                console.error(`Supabase 실시간 연결 실패: ${status}`);
+            }
+        });
+}
+
+async function loadRemoteTournamentState() {
+    const { data, error } = await bowlingSupabaseClient
+        .from('tournament_state')
+        .select('id, players, bracket_state, display_state, version, updated_at')
+        .eq('id', SUPABASE_TOURNAMENT_ID)
+        .maybeSingle();
+
+    if (error) {
+        console.error('Supabase 대진 상태 불러오기 실패:', error);
+        return null;
+    }
+
+    if (!data) {
+        console.error(`Supabase 대진 상태 행을 찾을 수 없습니다: ${SUPABASE_TOURNAMENT_ID}`);
+        return null;
+    }
+
+    applyRemoteTournamentState(data);
+    return data;
+}
+
+function hasRemoteBracketState(row) {
+    return Array.isArray(row?.players)
+        && row.players.length > 0
+        && Array.isArray(row?.bracket_state)
+        && row.bracket_state.length > 0;
+}
+
+function applyRemoteTournamentState(row) {
+    if (!row || row.id !== SUPABASE_TOURNAMENT_ID) return;
+
+    const incomingVersion = Number.parseInt(row.version, 10) || 0;
+    if (incomingVersion < remoteTournamentVersion) return;
+    remoteTournamentVersion = incomingVersion;
+
+    if (hasRemoteBracketState(row)) {
+        remoteTournamentStateInitialized = true;
+        const remotePlayers = normalizePlayers(row.players);
+        const bracketChanged = JSON.stringify(tournamentPlayers) !== JSON.stringify(remotePlayers)
+            || JSON.stringify(bracketState) !== JSON.stringify(row.bracket_state);
+
+        if (bracketChanged) {
+            tournamentPlayers = remotePlayers;
+            bracketState = row.bracket_state;
+            normalizeBracketState();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                version: TOURNAMENT_VERSION,
+                players: tournamentPlayers,
+                bracketState
+            }));
+            renderBracket();
+        }
+    }
+
+    const remoteDisplayState = normalizeRemoteDisplayState(row.display_state);
+    if (JSON.stringify(remoteDisplayState) !== JSON.stringify(currentDisplayState)) {
+        applyRemoteDisplayState(remoteDisplayState);
+    }
+}
+
+function normalizeRemoteDisplayState(displayState) {
+    const notice = displayState?.notice;
+    return {
+        notice: {
+            active: Boolean(notice?.active && notice?.message),
+            message: typeof notice?.message === 'string' ? notice.message : '',
+            highlightLosses: Boolean(notice?.highlightLosses)
+        }
+    };
+}
+
+function applyRemoteDisplayState(displayState) {
+    currentDisplayState = displayState;
+    const notice = displayState.notice;
+    if (notice.active) {
+        activateNoticeBoard(notice.message, { highlightLosses: notice.highlightLosses }, false);
+        return;
+    }
+
+    hideNoticeBoard();
+}
+
+async function ensureRemoteTournamentStateInitialized() {
+    if (!isAdminAuthenticated() || !bowlingSupabaseClient) return false;
+    if (remoteStateLoadPromise) await remoteStateLoadPromise;
+    if (remoteTournamentStateInitialized) return true;
+
+    const saved = await updateRemoteTournamentState();
+    if (saved) {
+        remoteTournamentStateInitialized = true;
+        showToast('현재 대진 상태를 Supabase에 초기 저장했습니다.');
+    }
+    return saved;
+}
+
+function scheduleRemoteTournamentStateSave() {
+    if (!isAdminAuthenticated() || !bowlingSupabaseClient) return;
+    remoteSavePending = true;
+    window.clearTimeout(remoteSaveTimer);
+    remoteSaveTimer = window.setTimeout(flushRemoteTournamentStateSave, 350);
+}
+
+async function flushRemoteTournamentStateSave() {
+    if (!remoteSavePending || remoteSaveInFlight || !isAdminAuthenticated()) return;
+
+    remoteSavePending = false;
+    remoteSaveInFlight = true;
+    try {
+        await ensureRemoteTournamentStateInitialized();
+        await updateRemoteTournamentState();
+    } finally {
+        remoteSaveInFlight = false;
+        if (remoteSavePending) scheduleRemoteTournamentStateSave();
+    }
+}
+
+async function updateRemoteTournamentState() {
+    if (!isAdminAuthenticated() || !bowlingSupabaseClient) return false;
+
+    const payload = {
+        players: tournamentPlayers,
+        bracket_state: bracketState,
+        display_state: currentDisplayState
+    };
+    const { data, error } = await bowlingSupabaseClient
+        .from('tournament_state')
+        .update(payload)
+        .eq('id', SUPABASE_TOURNAMENT_ID)
+        .select('id, players, bracket_state, display_state, version, updated_at')
+        .maybeSingle();
+
+    if (error || !data) {
+        console.error('Supabase 대진 상태 저장 실패:', error || '업데이트된 행 없음');
+        showToast('Supabase 저장에 실패했습니다. 이 기기의 로컬 상태는 유지됩니다.');
+        return false;
+    }
+
+    remoteTournamentVersion = Number.parseInt(data.version, 10) || remoteTournamentVersion;
+    remoteTournamentStateInitialized = hasRemoteBracketState(data);
+    return true;
+}
+
 function handleBracketViewportResize() {
-    scheduleRenderBracketLines();
+    if (!mobileBracketOverview || !window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) {
+        scheduleRenderBracketLines();
+    }
     scheduleMobileBracketView();
 }
 
 function setMobileBracketOverview(overview) {
     if (!window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) return;
     mobileBracketOverview = overview;
+    if (overview) refreshMobileBracketBoard();
     applyMobileBracketView();
+    if (!overview) scheduleRenderBracketLines();
+}
+
+function refreshMobileBracketBoard() {
+    const currentBoard = document.querySelector('#bracket-container .mobile-bracket-board');
+    currentBoard?.replaceWith(createMobileBracketBoard());
 }
 
 function preventMobileBracketPinch(event) {
-    if (window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) {
+    if (
+        window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches
+        && !mobileBracketOverview
+    ) {
         event.preventDefault();
     }
 }
@@ -123,33 +516,13 @@ function scheduleMobileBracketView() {
 function applyMobileBracketView() {
     const container = document.getElementById('bracket-container');
     const stage = container?.querySelector('.bracket-stage');
+    const mobileBoard = container?.querySelector('.mobile-bracket-board');
     const isMobile = window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches;
-    if (!container || !stage) return;
+    if (!container || !stage || !mobileBoard) return;
 
-    if (!isMobile || !mobileBracketOverview) {
-        document.body.classList.remove('mobile-bracket-overview');
-        stage.style.removeProperty('--mobile-bracket-scale');
-        container.style.removeProperty('--mobile-bracket-height');
-        updateMobileZoomControls(isMobile);
-        return;
-    }
-
-    const containerStyle = window.getComputedStyle(container);
-    const horizontalPadding = Number.parseFloat(containerStyle.paddingLeft)
-        + Number.parseFloat(containerStyle.paddingRight);
-    const verticalPadding = Number.parseFloat(containerStyle.paddingTop)
-        + Number.parseFloat(containerStyle.paddingBottom);
-    const stageWidth = stage.scrollWidth;
-    const stageHeight = stage.scrollHeight;
-    const availableWidth = Math.max(1, window.innerWidth - horizontalPadding);
-    const availableHeight = Math.max(240, window.innerHeight - container.getBoundingClientRect().top - 12);
-    const scale = Math.min(1, availableWidth / stageWidth, availableHeight / stageHeight);
-
-    stage.style.setProperty('--mobile-bracket-scale', String(scale));
-    container.style.setProperty('--mobile-bracket-height', `${Math.ceil(stageHeight * scale + verticalPadding)}px`);
+    document.body.classList.toggle('mobile-bracket-overview', isMobile && mobileBracketOverview);
     container.scrollLeft = 0;
-    document.body.classList.add('mobile-bracket-overview');
-    updateMobileZoomControls(true);
+    updateMobileZoomControls(isMobile);
 }
 
 function updateMobileZoomControls(isMobile) {
@@ -267,6 +640,7 @@ function setNoticeModalState(open) {
 
 function publishNotice(event) {
     event.preventDefault();
+    if (!requireAdminAccess('공지 입력')) return;
     const input = document.getElementById('notice-input');
     const message = input?.value.trim();
     if (!message) {
@@ -281,6 +655,7 @@ function publishNotice(event) {
 }
 
 function publishTeamStatus() {
+    if (!requireAdminAccess('팀원 현황 송출')) return;
     const teams = normalizePlayers(tournamentPlayers);
     if (teams.length === 0) {
         showToast('표시할 팀원 정보가 없습니다.');
@@ -302,6 +677,10 @@ function publishTeamStatus() {
 
 function publishRoundResults(event) {
     const select = event.currentTarget;
+    if (!requireAdminAccess('경기 결과 송출')) {
+        select.value = '';
+        return;
+    }
     const roundIndex = Number.parseInt(select.value, 10);
     if (Number.isNaN(roundIndex)) return;
 
@@ -339,7 +718,14 @@ function formatTeamResult(match, slot) {
     return `${team.name}${winnerMark} (${memberText} / 합계 ${total})`;
 }
 
-function activateNoticeBoard(message, options = {}) {
+function activateNoticeBoard(message, options = {}, persist = true) {
+    currentDisplayState = {
+        notice: {
+            active: true,
+            message: String(message),
+            highlightLosses: Boolean(options.highlightLosses)
+        }
+    };
     const board = document.getElementById('notice-board');
     const text = document.getElementById('notice-text');
     if (text) {
@@ -352,8 +738,8 @@ function activateNoticeBoard(message, options = {}) {
     if (board && text) {
         applyNoticeScrollDuration(text);
     }
-    const stopButton = document.getElementById('btn-notice-stop');
-    if (stopButton) stopButton.disabled = false;
+    syncNoticeStopButton();
+    if (persist) scheduleRemoteTournamentStateSave();
 }
 
 function renderNoticeMessage(container, message, options = {}) {
@@ -383,13 +769,29 @@ function renderNoticeMessage(container, message, options = {}) {
 }
 
 function stopNotice() {
+    if (!requireAdminAccess('공지 정지')) return;
+    currentDisplayState = createEmptyDisplayState();
+    hideNoticeBoard();
+    scheduleRemoteTournamentStateSave();
+}
+
+function hideNoticeBoard() {
     const board = document.getElementById('notice-board');
     board?.classList.remove('is-active');
     board?.setAttribute('aria-hidden', 'true');
-    const stopButton = document.getElementById('btn-notice-stop');
-    if (stopButton) stopButton.disabled = true;
+    syncNoticeStopButton();
     const roundResultSelect = document.getElementById('round-result-select');
     if (roundResultSelect) roundResultSelect.value = '';
+}
+
+function createEmptyDisplayState() {
+    return {
+        notice: {
+            active: false,
+            message: '',
+            highlightLosses: false
+        }
+    };
 }
 
 let bracketState = [];
@@ -401,6 +803,20 @@ let noticeScrollSpeed = DEFAULT_NOTICE_SCROLL_SPEED;
 const MOBILE_BRACKET_BREAKPOINT = 640;
 let mobileBracketOverview = true;
 let mobileBracketViewFrame = 0;
+const supabaseConfig = window.BOWLING_SUPABASE_CONFIG || {};
+const bowlingSupabaseClient = window.supabase && supabaseConfig.url && supabaseConfig.publishableKey
+    ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
+    : null;
+const SUPABASE_TOURNAMENT_ID = 'bowling-2026';
+let currentAdminUser = null;
+let currentDisplayState = createEmptyDisplayState();
+let tournamentStateChannel = null;
+let remoteStateLoadPromise = null;
+let remoteTournamentStateInitialized = false;
+let remoteTournamentVersion = -1;
+let remoteSaveTimer = 0;
+let remoteSavePending = false;
+let remoteSaveInFlight = false;
 
 const pageTournamentConfig = window.BOWLING_BRACKET_CONFIG || {};
 const pageFormatConfig = pageTournamentConfig.format || {};
@@ -841,9 +1257,11 @@ function saveToLocalStorage() {
         players: tournamentPlayers,
         bracketState
     }));
+    scheduleRemoteTournamentStateSave();
 }
 
 function resetBracket() {
+    if (!requireAdminAccess('대진표 초기화')) return;
     if (confirm('정말로 대진표를 초기화하시겠습니까?\n모든 진출 결과와 입력하신 점수가 영구 삭제됩니다.')) {
         localStorage.removeItem(STORAGE_KEY);
         fetchData();
@@ -878,6 +1296,7 @@ function downloadJSON() {
 }
 
 function restoreJSON() {
+    if (!requireAdminAccess('대진 복원')) return;
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,application/json';
@@ -905,6 +1324,7 @@ function restoreJSON() {
 }
 
 function restoreFromBackup(data) {
+    if (!requireAdminAccess('대진 복원')) return;
     if (!data || typeof data !== 'object') {
         showToast('복원 실패: 백업 데이터가 비어 있습니다.');
         return;
@@ -936,6 +1356,7 @@ function restoreFromBackup(data) {
 }
 
 function selectWinner(rIndex, mIndex, player) {
+    if (!requireAdminAccess('승패 변경')) return;
     if (!player) return;
 
     const currentMatch = bracketState[rIndex]?.[mIndex];
@@ -1124,14 +1545,186 @@ function renderBracket() {
     renderChampion(board);
     stage.appendChild(board);
     container.appendChild(stage);
+    container.appendChild(createMobileBracketBoard());
     if (hasRenderedBoard) {
         container.scrollLeft = Math.min(previousScrollLeft, Math.max(0, container.scrollWidth - container.clientWidth));
     } else {
         container.scrollLeft = 0;
     }
     renderTeamSidebar();
-    scheduleRenderBracketLines();
+    if (!mobileBracketOverview || !window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) {
+        scheduleRenderBracketLines();
+    }
     scheduleMobileBracketView();
+}
+
+function createMobileBracketBoard() {
+    const mobileBoard = document.createElement('section');
+    mobileBoard.className = 'mobile-bracket-board';
+    mobileBoard.setAttribute('aria-label', '모바일 대진표');
+
+    const standings = getMobileFinalStandings();
+    if (standings.champion) {
+        const champion = document.createElement('div');
+        champion.className = 'mobile-champion';
+
+        const championName = document.createElement('strong');
+        championName.textContent = `🏆 ${standings.champion.name}`;
+        champion.appendChild(championName);
+        champion.appendChild(createMobilePlacementMembers(standings.champion));
+        mobileBoard.appendChild(champion);
+    }
+
+    const confirmedPlacements = [
+        { rank: 2, team: standings.second },
+        { rank: 3, team: standings.third },
+        { rank: 4, team: standings.fourth }
+    ].filter(placement => placement.team);
+
+    if (confirmedPlacements.length > 0) {
+        const placementGrid = document.createElement('div');
+        placementGrid.className = `mobile-placement-grid placement-count-${confirmedPlacements.length}`;
+
+        confirmedPlacements.forEach(placement => {
+            const item = document.createElement('div');
+            item.className = `mobile-placement mobile-placement-${placement.rank}`;
+
+            const rank = document.createElement('span');
+            rank.textContent = `${placement.rank}등`;
+            item.appendChild(rank);
+
+            const teamName = document.createElement('strong');
+            teamName.textContent = placement.team.name;
+            item.appendChild(teamName);
+            item.appendChild(createMobilePlacementMembers(placement.team));
+            placementGrid.appendChild(item);
+        });
+        mobileBoard.appendChild(placementGrid);
+    }
+
+    bracketState.forEach((round, roundIndex) => {
+        const roundSection = document.createElement('section');
+        roundSection.className = 'mobile-round';
+
+        const title = document.createElement('h2');
+        title.textContent = roundTitles[roundIndex] || `Round ${roundIndex + 1}`;
+        roundSection.appendChild(title);
+
+        const matchGrid = document.createElement('div');
+        matchGrid.className = 'mobile-match-grid';
+        round.forEach((match, matchIndex) => {
+            matchGrid.appendChild(createMobileMatchCard(match, matchIndex));
+        });
+        roundSection.appendChild(matchGrid);
+        mobileBoard.appendChild(roundSection);
+
+        if (roundIndex < bracketState.length - 1) {
+            const connector = document.createElement('div');
+            connector.className = 'mobile-round-connector';
+            connector.setAttribute('aria-hidden', 'true');
+            connector.textContent = '↓';
+            mobileBoard.appendChild(connector);
+        }
+    });
+
+    return mobileBoard;
+}
+
+function createMobilePlacementMembers(team) {
+    const members = document.createElement('div');
+    members.className = 'mobile-placement-members';
+    members.textContent = Array.isArray(team?.members) && team.members.length > 0
+        ? team.members.join(' · ')
+        : '팀원 없음';
+    return members;
+}
+
+function getMobileFinalStandings() {
+    const finalMatch = bracketState[bracketState.length - 1]?.[0];
+    const standings = {
+        champion: finalMatch?.winner || null,
+        second: null,
+        third: null,
+        fourth: null
+    };
+    if (!finalMatch) return standings;
+
+    const slots = getMatchSlots(finalMatch);
+    const thirdPlaceSlot = getLowestFinalScoreSlot(finalMatch);
+    if (thirdPlaceSlot) standings.third = finalMatch[thirdPlaceSlot];
+
+    if (standings.champion) {
+        const secondPlaceSlot = slots.find(slot => (
+            finalMatch[slot]
+            && !isSameTeam(finalMatch[slot], standings.champion)
+            && slot !== thirdPlaceSlot
+        ));
+        if (secondPlaceSlot) standings.second = finalMatch[secondPlaceSlot];
+    }
+
+    const fourthPlaceQualifier = getFourthPlaceQualifier();
+    if (fourthPlaceQualifier) {
+        standings.fourth = bracketState[fourthPlaceQualifier.roundIndex]
+            ?.[fourthPlaceQualifier.matchIndex]
+            ?.[fourthPlaceQualifier.slot] || null;
+    }
+
+    return standings;
+}
+
+function createMobileMatchCard(match, matchIndex) {
+    const card = document.createElement('article');
+    card.className = 'mobile-match-card';
+
+    const matchNumber = document.createElement('div');
+    matchNumber.className = 'mobile-match-number';
+    matchNumber.textContent = `${matchIndex + 1}경기`;
+    card.appendChild(matchNumber);
+
+    getMatchSlots(match).forEach(slot => {
+        const team = match[slot];
+        const teamRow = document.createElement('div');
+        teamRow.className = 'mobile-team-row';
+
+        if (!team) {
+            teamRow.classList.add('is-empty');
+            teamRow.textContent = match.byeSlot === slot ? match.byeLabel || '부전승' : '대기중';
+            card.appendChild(teamRow);
+            return;
+        }
+
+        if (match.winner) {
+            teamRow.classList.add(isSameTeam(team, match.winner) ? 'is-winner' : 'is-loser');
+        }
+
+        const memberScores = getSlotMemberScores(match, slot, team);
+        const memberTotal = calculateMemberScoreTotal(memberScores);
+        const savedTotal = String(match[`${slot}Score`] ?? '').trim();
+
+        const header = document.createElement('div');
+        header.className = 'mobile-team-header';
+
+        const name = document.createElement('strong');
+        name.textContent = team.name;
+        header.appendChild(name);
+
+        const total = document.createElement('span');
+        total.textContent = `합계 ${memberTotal || savedTotal || '-'}`;
+        header.appendChild(total);
+        teamRow.appendChild(header);
+
+        const members = document.createElement('div');
+        members.className = 'mobile-member-grid';
+        getScoreMembers(team).forEach((member, memberIndex) => {
+            const memberItem = document.createElement('span');
+            memberItem.textContent = `${member} ${memberScores[memberIndex] || '-'}`;
+            members.appendChild(memberItem);
+        });
+        teamRow.appendChild(members);
+        card.appendChild(teamRow);
+    });
+
+    return card;
 }
 
 function renderTeamSidebar() {
@@ -1498,6 +2091,7 @@ function createMatchDiv(match, rIndex, mIndex) {
             () => selectWinner(rIndex, mIndex, match[slot]),
             match[`${slot}Score`],
             isByeMatch ? null : (val, memberScores) => {
+                if (!requireAdminAccess('점수 입력')) return;
                 match[`${slot}Score`] = val;
                 match[`${slot}MemberScores`] = memberScores;
                 saveToLocalStorage();
@@ -1605,10 +2199,6 @@ function getLowestFinalScoreSlot(finalMatch, options = {}) {
 }
 
 function getFourthPlaceQualifier() {
-    const finalMatch = bracketState[bracketState.length - 1]?.[0];
-    if (!finalMatch || getMatchSlots(finalMatch).length < 3) return null;
-    if (!getLowestFinalScoreSlot(finalMatch)) return null;
-
     const qualifierRoundIndex = bracketState.length - 2;
     const qualifierRound = bracketState[qualifierRoundIndex];
     if (!Array.isArray(qualifierRound) || qualifierRound.length === 0) return null;
@@ -1714,6 +2304,8 @@ function openMemberScoreEditor(playerDiv, scoreInput, popover) {
 function createPlayerDiv(playerObj, winner, onClick, scoreVal, onScoreChange, options = {}) {
     const div = document.createElement('div');
     div.className = 'player';
+    const canEdit = isAdminAuthenticated();
+    if (!canEdit) div.classList.add('is-read-only');
     if (options.slot) {
         div.dataset.slot = options.slot;
     }
@@ -1771,13 +2363,16 @@ function createPlayerDiv(playerObj, winner, onClick, scoreVal, onScoreChange, op
                 scoreInput.value = total;
                 onScoreChange(total, scores);
             },
-            options.refreshOnScoreBlur
+            options.refreshOnScoreBlur,
+            canEdit
         );
 
-        scoreInput.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openMemberScoreEditor(div, scoreInput, memberScoreEditor);
-        });
+        if (canEdit) {
+            scoreInput.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openMemberScoreEditor(div, scoreInput, memberScoreEditor);
+            });
+        }
 
         div.appendChild(scoreInput);
         div.appendChild(memberScoreEditor);
@@ -1794,13 +2389,13 @@ function createPlayerDiv(playerObj, winner, onClick, scoreVal, onScoreChange, op
     } else if (winner !== null && playerObj !== winner) {
         div.classList.add('loser');
     }
-    div.onclick = onClick;
+    div.onclick = canEdit ? onClick : null;
 
     appendMembersTooltip(div, playerObj);
     return div;
 }
 
-function createMemberScoreEditor(playerObj, memberScores, fallbackTotal, onScoresChange, refreshOnClose) {
+function createMemberScoreEditor(playerObj, memberScores, fallbackTotal, onScoresChange, refreshOnClose, canEdit) {
     const editor = document.createElement('div');
     editor.className = 'member-score-popover';
     editor.addEventListener('click', (event) => event.stopPropagation());
@@ -1832,19 +2427,22 @@ function createMemberScoreEditor(playerObj, memberScores, fallbackTotal, onScore
         input.placeholder = '-';
         input.maxLength = 3;
         input.inputMode = 'numeric';
+        input.disabled = !canEdit;
         input.setAttribute('aria-label', `${member} 점수`);
 
-        input.addEventListener('input', (event) => {
-            const value = normalizeScoreValue(event.target.value);
-            event.target.value = value;
-            scores[index] = value;
+        if (canEdit) {
+            input.addEventListener('input', (event) => {
+                const value = normalizeScoreValue(event.target.value);
+                event.target.value = value;
+                scores[index] = value;
 
-            const total = calculateMemberScoreTotal(scores);
-            totalValue.textContent = total || '-';
-            onScoresChange([...scores], total);
-        });
+                const total = calculateMemberScoreTotal(scores);
+                totalValue.textContent = total || '-';
+                onScoresChange([...scores], total);
+            });
+        }
 
-        if (refreshOnClose) {
+        if (refreshOnClose && canEdit) {
             input.addEventListener('blur', () => {
                 window.setTimeout(() => {
                     if (!editor.contains(document.activeElement)) {
