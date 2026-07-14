@@ -234,6 +234,7 @@ function updateAdminAuthUi(user, unavailableLabel = '') {
     currentAdminUser = user || null;
     document.body.classList.toggle('admin-authenticated', Boolean(currentAdminUser));
     document.body.classList.toggle('admin-read-only', !currentAdminUser);
+    if (!currentAdminUser) setHelpModalState(false);
 
     const button = document.getElementById('btn-admin-auth');
     if (!button) return;
@@ -848,6 +849,7 @@ const DIRECT_MAIN_LEGEND_TEXT = pageFormatConfig.directMainLegendText
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const THEME_STORAGE_KEY = 'bowling_bracket_theme';
 const NAV_STORAGE_KEY = 'bowling_bracket_nav_collapsed';
+const MOBILE_NAV_STORAGE_KEY = 'bowling_bracket_mobile_nav_collapsed_v1';
 
 const roundTitles = pageFormatConfig.roundTitles
     || pageTournamentConfig.roundTitles
@@ -860,8 +862,11 @@ const preliminaryLanes = pageFormatConfig.preliminaryLanes
     || (PRELIMINARY_TEAMS === 14 ? DEFAULT_PRELIMINARY_LANES : null);
 
 function initializeNavState() {
-    const isCollapsed = localStorage.getItem(NAV_STORAGE_KEY) === 'true';
-    setNavState(isCollapsed);
+    const isMobile = window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches;
+    const storageKey = isMobile ? MOBILE_NAV_STORAGE_KEY : NAV_STORAGE_KEY;
+    const savedState = localStorage.getItem(storageKey);
+    const isCollapsed = savedState === null ? isMobile : savedState === 'true';
+    setNavState(isCollapsed, false);
 }
 
 function toggleNav() {
@@ -870,16 +875,20 @@ function toggleNav() {
     setNavState(!isCurrentlyCollapsed);
 }
 
-function setNavState(collapsed) {
+function setNavState(collapsed, persist = true) {
     const topBar = document.getElementById('top-bar');
     if (!topBar) return;
 
     topBar.classList.toggle('collapsed', collapsed);
     document.body.classList.toggle('nav-collapsed', collapsed);
-    localStorage.setItem(NAV_STORAGE_KEY, collapsed);
+    if (persist) {
+        const isMobile = window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches;
+        localStorage.setItem(isMobile ? MOBILE_NAV_STORAGE_KEY : NAV_STORAGE_KEY, String(collapsed));
+    }
 }
 
 function setHelpModalState(open) {
+    if (open && !isAdminAuthenticated()) return;
     const modal = document.getElementById('help-modal');
     const overlay = document.getElementById('help-modal-overlay');
     const helpButton = document.getElementById('btn-help');

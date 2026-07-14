@@ -563,6 +563,10 @@ body.admin-read-only .notice-controls {
     display: none;
 }
 
+body.admin-read-only #btn-help {
+    display: none;
+}
+
 body.admin-read-only .bracket-stage .player.is-read-only:not(.empty),
 body.admin-read-only .bracket-stage .score-input {
     cursor: default;
