@@ -1714,19 +1714,40 @@ function createMobileMatchCard(match, matchIndex) {
         header.className = 'mobile-team-header';
 
         const name = document.createElement('strong');
+        name.className = 'mobile-team-name';
         name.textContent = team.name;
         header.appendChild(name);
 
-        const total = document.createElement('span');
-        total.textContent = `합계 ${memberTotal || savedTotal || '-'}`;
+        const total = document.createElement('div');
+        total.className = 'mobile-team-total';
+
+        const totalLabel = document.createElement('span');
+        totalLabel.textContent = '합계';
+        total.appendChild(totalLabel);
+
+        const totalValue = document.createElement('strong');
+        totalValue.textContent = memberTotal || savedTotal || '-';
+        total.appendChild(totalValue);
+
         header.appendChild(total);
         teamRow.appendChild(header);
 
         const members = document.createElement('div');
         members.className = 'mobile-member-grid';
         getScoreMembers(team).forEach((member, memberIndex) => {
-            const memberItem = document.createElement('span');
-            memberItem.textContent = `${member} ${memberScores[memberIndex] || '-'}`;
+            const memberItem = document.createElement('div');
+            memberItem.className = 'mobile-member-item';
+
+            const memberName = document.createElement('span');
+            memberName.className = 'mobile-member-name';
+            memberName.textContent = member;
+            memberItem.appendChild(memberName);
+
+            const memberScore = document.createElement('strong');
+            memberScore.className = 'mobile-member-score';
+            memberScore.textContent = memberScores[memberIndex] || '-';
+            memberItem.appendChild(memberScore);
+
             members.appendChild(memberItem);
         });
         teamRow.appendChild(members);

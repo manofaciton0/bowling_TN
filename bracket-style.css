@@ -1223,13 +1223,15 @@ body.help-modal-open .help-modal {
         border-radius: 8px;
         background: rgba(245, 158, 11, 0.12);
         color: var(--text-primary);
-        font-size: 1.08rem;
+        font-size: 1.15rem;
         font-weight: 900;
         text-align: center;
     }
 
     .mobile-champion > strong {
         display: block;
+        font-size: 1.3rem;
+        line-height: 1.15;
     }
 
     .mobile-placement-grid {
@@ -1267,19 +1269,27 @@ body.help-modal-open .help-modal {
 
     .mobile-placement span {
         margin-bottom: 3px;
-        font-size: 0.68rem;
+        font-size: 0.72rem;
         font-weight: 900;
     }
 
     .mobile-placement strong {
-        font-size: 0.8rem;
+        font-size: 0.98rem;
         line-height: 1.2;
+    }
+
+    .mobile-placement-grid.placement-count-1 .mobile-placement strong {
+        font-size: 1.15rem;
+    }
+
+    .mobile-placement-grid.placement-count-2 .mobile-placement strong {
+        font-size: 1.05rem;
     }
 
     .mobile-placement-members {
         margin-top: 5px;
         color: var(--text-secondary);
-        font-size: 0.62rem;
+        font-size: 0.72rem;
         font-weight: 600;
         line-height: 1.35;
         overflow-wrap: anywhere;
@@ -1287,7 +1297,7 @@ body.help-modal-open .help-modal {
 
     .mobile-champion .mobile-placement-members {
         margin-top: 6px;
-        font-size: 0.72rem;
+        font-size: 0.82rem;
     }
 
     .mobile-placement-2 { border-color: var(--runner-up-border); background: var(--runner-up-bg); }
@@ -1303,10 +1313,11 @@ body.help-modal-open .help-modal {
     }
 
     .mobile-round h2 {
-        margin: 0 0 8px;
+        margin: 0 0 10px;
         padding: 0 2px;
         color: var(--text-primary);
-        font-size: 0.92rem;
+        font-size: 1.45rem;
+        font-weight: 900;
         line-height: 1.2;
     }
 
@@ -1325,12 +1336,13 @@ body.help-modal-open .help-modal {
     }
 
     .mobile-match-number {
-        padding: 4px 6px;
+        padding: 6px 7px;
         border-bottom: 1px solid var(--match-border);
         background: var(--pill-bg);
-        color: var(--text-secondary);
-        font-size: 0.66rem;
-        font-weight: 800;
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        font-weight: 900;
+        line-height: 1.15;
     }
 
     .mobile-team-row {
@@ -1356,7 +1368,7 @@ body.help-modal-open .help-modal {
         display: flex;
         align-items: center;
         color: var(--text-secondary);
-        font-size: 0.72rem;
+        font-size: 0.78rem;
         font-weight: 700;
     }
 
@@ -1369,20 +1381,45 @@ body.help-modal-open .help-modal {
         margin-bottom: 4px;
     }
 
-    .mobile-team-header strong {
+    .mobile-team-name {
         min-width: 0;
         overflow: hidden;
-        font-size: 0.82rem;
+        font-size: 1.3rem;
         line-height: 1.15;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
-    .mobile-team-header span {
+    .mobile-team-total {
         flex: 0 0 auto;
+        min-width: 38px;
+        display: grid;
+        justify-items: end;
+        line-height: 1;
+    }
+
+    .mobile-team-total span {
         color: var(--text-secondary);
-        font-size: 0.68rem;
+        font-size: 0.62rem;
         font-weight: 800;
+    }
+
+    .mobile-team-total strong {
+        margin-top: 3px;
+        color: var(--text-primary);
+        font-size: 1.2rem;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .mobile-team-row.is-winner .mobile-team-total strong {
+        color: #047857;
+        font-size: 1.2rem;
+        text-shadow: 0 0 6px rgba(5, 150, 105, 0.24);
+    }
+
+    body.theme-dark .mobile-team-row.is-winner .mobile-team-total strong {
+        color: #34d399;
     }
 
     .mobile-member-grid {
@@ -1391,14 +1428,30 @@ body.help-modal-open .help-modal {
         gap: 2px 5px;
     }
 
-    .mobile-member-grid span {
+    .mobile-member-item {
+        min-width: 0;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 3px;
+    }
+
+    .mobile-member-name {
         min-width: 0;
         overflow: hidden;
         color: var(--text-secondary);
-        font-size: 0.64rem;
-        line-height: 1.25;
+        font-size: 1rem;
+        line-height: 1.2;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+
+    .mobile-member-score {
+        flex: 0 0 auto;
+        color: var(--text-primary);
+        font-size: 0.7rem;
+        font-weight: 900;
+        line-height: 1.2;
     }
 
     .mobile-round-connector {
