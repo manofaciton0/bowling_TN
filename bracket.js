@@ -481,10 +481,18 @@ async function updateRemoteTournamentState() {
 }
 
 function handleBracketViewportResize() {
+    const viewportWidth = getBracketViewportWidth();
+    if (viewportWidth === lastBracketViewportWidth) return;
+    lastBracketViewportWidth = viewportWidth;
+
     if (!mobileBracketOverview || !window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches) {
         scheduleRenderBracketLines();
     }
     scheduleMobileBracketView();
+}
+
+function getBracketViewportWidth() {
+    return Math.round(document.documentElement.clientWidth || window.innerWidth);
 }
 
 function setMobileBracketOverview(overview) {
@@ -523,8 +531,16 @@ function applyMobileBracketView() {
     const isMobile = window.matchMedia(`(max-width: ${MOBILE_BRACKET_BREAKPOINT}px)`).matches;
     if (!container || !stage || !mobileBoard) return;
 
+    const viewKey = `${isMobile}:${mobileBracketOverview}`;
+    const viewChanged = viewKey !== appliedMobileBracketViewKey;
+
     document.body.classList.toggle('mobile-bracket-overview', isMobile && mobileBracketOverview);
-    container.scrollLeft = 0;
+    // iOS Safari changes the viewport height while its address bar appears or hides.
+    // That resize must not send a user who is panning the desktop bracket back to the left.
+    if (viewChanged) {
+        container.scrollLeft = 0;
+        appliedMobileBracketViewKey = viewKey;
+    }
     updateMobileZoomControls(isMobile);
 }
 
@@ -806,6 +822,8 @@ let noticeScrollSpeed = DEFAULT_NOTICE_SCROLL_SPEED;
 const MOBILE_BRACKET_BREAKPOINT = 640;
 let mobileBracketOverview = true;
 let mobileBracketViewFrame = 0;
+let appliedMobileBracketViewKey = null;
+let lastBracketViewportWidth = getBracketViewportWidth();
 const supabaseConfig = window.BOWLING_SUPABASE_CONFIG || {};
 const bowlingSupabaseClient = window.supabase && supabaseConfig.url && supabaseConfig.publishableKey
     ? window.supabase.createClient(supabaseConfig.url, supabaseConfig.publishableKey)
