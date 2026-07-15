@@ -653,7 +653,7 @@ body.team-sidebar-open .team-sidebar {
     background: var(--input-bg);
     color: var(--text-primary);
     font: inherit;
-    font-size: 0.9rem;
+    font-size: 16px;
 }
 
 .team-sidebar-search input:focus {
@@ -750,6 +750,15 @@ body.team-sidebar-open .team-sidebar {
     margin: 0;
     font-size: 1rem;
     line-height: 1.2;
+}
+
+.team-sidebar-score-toggle-label {
+    display: inline-block;
+    margin-left: 7px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    vertical-align: 1px;
 }
 
 .team-sidebar-card.has-score-records .team-sidebar-team-name::after {
@@ -850,7 +859,30 @@ body.theme-dark .team-sidebar-score-round {
     font-size: 0.9rem;
 }
 
-.team-sidebar-score-round-header span {
+.team-sidebar-score-round-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.team-sidebar-match-result {
+    flex: 0 0 auto;
+    font-size: 0.82rem;
+    font-weight: 900;
+}
+
+.team-sidebar-match-result.is-win {
+    color: #2563eb;
+    text-shadow: 0 0 5px rgba(37, 99, 235, 0.22);
+}
+
+.team-sidebar-match-result.is-loss {
+    color: #dc2626;
+    text-shadow: 0 0 5px rgba(220, 38, 38, 0.2);
+}
+
+.team-sidebar-score-total {
     color: var(--winner-border);
     font-size: 0.86rem;
     font-weight: 800;
@@ -1987,7 +2019,7 @@ body.help-modal-open .help-modal {
     border-radius: 7px;
     color: var(--text-primary);
     text-align: center;
-    font-size: 0.92rem;
+    font-size: 16px;
     font-weight: 800;
     box-sizing: border-box;
 }
@@ -2257,7 +2289,7 @@ body.theme-dark .placement-4 {
     border-radius: 6px;
     color: var(--text-primary);
     text-align: center;
-    font-size: 0.9rem;
+    font-size: 16px;
     font-weight: 700;
     transition: all 0.2s ease;
     margin: 0;

@@ -1796,6 +1796,7 @@ function renderTeamSidebar() {
     filteredPlayers.forEach(({ team, index }) => {
         const card = document.createElement('article');
         card.className = 'team-sidebar-card';
+        const scoreRecords = getTeamScoreRecords(team);
 
         const header = document.createElement('div');
         header.className = 'team-sidebar-card-header';
@@ -1803,6 +1804,12 @@ function renderTeamSidebar() {
         const name = document.createElement('h3');
         name.className = 'team-sidebar-team-name';
         name.textContent = team.name;
+        if (scoreRecords.length > 0) {
+            const scoreToggleLabel = document.createElement('span');
+            scoreToggleLabel.className = 'team-sidebar-score-toggle-label';
+            scoreToggleLabel.textContent = '점수 확인';
+            name.appendChild(scoreToggleLabel);
+        }
         header.appendChild(name);
 
         if (index >= PRELIMINARY_TEAMS) {
@@ -1812,7 +1819,6 @@ function renderTeamSidebar() {
             header.appendChild(badge);
         }
 
-        const scoreRecords = getTeamScoreRecords(team);
         if (scoreRecords.length > 0) {
             const isExpanded = expandedSidebarTeamName === team.name;
             card.classList.add('has-score-records');
@@ -1882,6 +1888,9 @@ function getTeamScoreRecords(team) {
 
                 records.push({
                     roundTitle: roundTitles[rIndex] || `Round ${rIndex + 1}`,
+                    result: match.winner
+                        ? (isSameTeam(slotTeam, match.winner) ? 'win' : 'loss')
+                        : null,
                     members: getScoreMembers(slotTeam).map((member, index) => ({
                         name: member,
                         score: memberScores[index] || ''
@@ -1907,11 +1916,23 @@ function createTeamScoreHistory(records) {
         const header = document.createElement('div');
         header.className = 'team-sidebar-score-round-header';
 
+        const titleGroup = document.createElement('div');
+        titleGroup.className = 'team-sidebar-score-round-title';
+
         const title = document.createElement('strong');
         title.textContent = record.roundTitle;
-        header.appendChild(title);
+        titleGroup.appendChild(title);
+
+        if (record.result) {
+            const result = document.createElement('span');
+            result.className = `team-sidebar-match-result is-${record.result}`;
+            result.textContent = record.result === 'win' ? '[승]' : '[패]';
+            titleGroup.appendChild(result);
+        }
+        header.appendChild(titleGroup);
 
         const total = document.createElement('span');
+        total.className = 'team-sidebar-score-total';
         total.textContent = `합계 ${record.total || '-'}`;
         header.appendChild(total);
 
