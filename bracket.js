@@ -871,6 +871,7 @@ const THEME_STORAGE_KEY = 'bowling_bracket_theme';
 const NAV_STORAGE_KEY = 'bowling_bracket_nav_collapsed';
 const MOBILE_NAV_STORAGE_KEY = 'bowling_bracket_mobile_nav_collapsed_v1';
 
+const PLACEMENT_BY_LAST_ROUND_SCORES = pageFormatConfig.placementRule === 'last-round-winner-scores';
 const roundTitles = pageFormatConfig.roundTitles
     || pageTournamentConfig.roundTitles
     || ['예선 14강', '본선 11강', '본선 6강', '준결승', '결승'];
@@ -1182,6 +1183,17 @@ function initTwelvePrelimFinalThree(preliminaryPlayers, directMainPlayers) {
     }
 
     const sixRound = createEmptyRound('six', 3);
+
+    if (PLACEMENT_BY_LAST_ROUND_SCORES) {
+        bracketState.push(preliminaryRound);
+        bracketState.push(mainRound);
+        bracketState.push(sixRound);
+
+        saveToLocalStorage();
+        renderBracket();
+        return;
+    }
+
     sixRound.forEach((match, index) => {
         match.route = {
             roundIndex: 3,
@@ -1542,7 +1554,7 @@ function renderBracket() {
             legendDiv.className = 'direct-main-legend prelim-legend';
             legendDiv.innerHTML = `<span class="direct-main-badge">🍯</span> : ${DIRECT_MAIN_LEGEND_TEXT}`;
             roundDiv.appendChild(legendDiv);
-        } else if (isFinalQualifyingRound(rIndex, round)) {
+        } else if (isFinalQualifyingRound(rIndex, round) || isLastRoundPlacementRound(rIndex, round)) {
             renderCenteredRound(roundDiv, round, rIndex);
         } else if (round.length > 1) {
             for (let i = 0; i < round.length; i += 2) {
@@ -1669,6 +1681,9 @@ function createMobilePlacementMembers(team) {
 }
 
 function getMobileFinalStandings() {
+    const lastRoundStandings = getLastRoundStandings();
+    if (lastRoundStandings) return lastRoundStandings;
+
     const finalMatch = bracketState[bracketState.length - 1]?.[0];
     const standings = {
         champion: finalMatch?.winner || null,
@@ -1987,6 +2002,80 @@ function isFinalQualifyingRound(rIndex, round) {
         && getMatchSlots(finalMatch).length === FINAL_ROUND_TEAM_COUNT;
 }
 
+function isLastRoundPlacementRound(rIndex, round) {
+    return PLACEMENT_BY_LAST_ROUND_SCORES
+        && rIndex === bracketState.length - 1
+        && Array.isArray(round)
+        && round.length === FINAL_ROUND_TEAM_COUNT
+        && round.every(match => getMatchSlots(match).length === 2);
+}
+
+// 마지막 라운드(본선 6강) 승리 팀들의 점수로 1~3등, 패배 팀 중 최고 점수로 4등을 정합니다.
+// 동점이 있으면 해당 순위는 확정하지 않습니다.
+function getLastRoundStandings() {
+    const roundIndex = bracketState.length - 1;
+    const round = bracketState[roundIndex];
+    if (!isLastRoundPlacementRound(roundIndex, round)) return null;
+
+    const standings = {
+        champion: null,
+        second: null,
+        third: null,
+        fourth: null,
+        placements: {}
+    };
+
+    const results = round.map((match, matchIndex) => {
+        if (!match?.winner) return null;
+
+        const slots = getMatchSlots(match);
+        const winnerSlot = slots.find(slot => isSameTeam(match[slot], match.winner));
+        const loserSlot = slots.find(slot => match[slot] && slot !== winnerSlot);
+        if (!winnerSlot || !loserSlot) return null;
+
+        return {
+            matchIndex,
+            winner: { slot: winnerSlot, team: match[winnerSlot], score: parseScoreValue(match[`${winnerSlot}Score`]) },
+            loser: { slot: loserSlot, team: match[loserSlot], score: parseScoreValue(match[`${loserSlot}Score`]) }
+        };
+    });
+    if (results.some(result => !result)) return standings;
+
+    const setPlacement = (result, side, rank, key) => {
+        standings[key] = result[side].team;
+        standings.placements[`${result.matchIndex}:${result[side].slot}`] = {
+            rank,
+            label: rank === 1 ? '🏆 1등' : `${rank}등`
+        };
+    };
+
+    if (results.every(result => result.winner.score !== null)) {
+        const winners = [...results].sort((a, b) => b.winner.score - a.winner.score);
+        const hasTie = winners.some((result, index) => index > 0 && result.winner.score === winners[index - 1].winner.score);
+        if (!hasTie) {
+            setPlacement(winners[0], 'winner', 1, 'champion');
+            setPlacement(winners[1], 'winner', 2, 'second');
+            setPlacement(winners[2], 'winner', 3, 'third');
+        }
+    }
+
+    if (results.every(result => result.loser.score !== null)) {
+        const losers = [...results].sort((a, b) => b.loser.score - a.loser.score);
+        if (losers[0].loser.score !== losers[1].loser.score) {
+            setPlacement(losers[0], 'loser', 4, 'fourth');
+        }
+    }
+
+    return standings;
+}
+
+function getChampionTeam() {
+    const lastRoundStandings = getLastRoundStandings();
+    if (lastRoundStandings) return lastRoundStandings.champion;
+
+    return bracketState[bracketState.length - 1]?.[0]?.winner || null;
+}
+
 function renderCenteredRound(roundDiv, round, rIndex) {
     round.forEach((match, mIndex) => {
         roundDiv.appendChild(createMatchDiv(match, rIndex, mIndex));
@@ -2036,9 +2125,28 @@ function renderBracketLines(container) {
         });
     });
 
+    const championEl = container.querySelector('.champion-box');
+    const lastRoundIndex = bracketState.length - 1;
+    const lastRound = bracketState[lastRoundIndex];
+    if (championEl && isLastRoundPlacementRound(lastRoundIndex, lastRound)) {
+        const champion = getChampionTeam();
+        lastRound.forEach((match, mIndex) => {
+            const matchEl = getMatchElement(container, lastRoundIndex, mIndex);
+            if (!matchEl) return;
+
+            drawBracketLine(
+                svg,
+                getElementPoint(matchEl, stage, 0.5, 0),
+                getElementPoint(championEl, stage, 0.5, 1),
+                Boolean(champion && isSameTeam(match.winner, champion))
+            );
+        });
+        stage.appendChild(svg);
+        return;
+    }
+
     const finalMatch = bracketState[bracketState.length - 1]?.[0];
     const finalEl = getMatchElement(container, bracketState.length - 1, 0);
-    const championEl = container.querySelector('.champion-box');
     if (finalEl && championEl) {
         drawBracketLine(
             svg,
@@ -2130,21 +2238,21 @@ function renderChampion(container) {
     finalTitle.textContent = 'CHAMPION';
     finalRoundDiv.appendChild(finalTitle);
 
-    const finalMatch = bracketState[bracketState.length - 1]?.[0];
+    const champion = getChampionTeam();
     const championCard = document.createElement('div');
     championCard.className = 'match champion-box';
-    if (finalMatch?.winner) {
+    if (champion) {
         championCard.classList.add('has-winner');
     }
 
     const champDiv = document.createElement('div');
-    if (finalMatch?.winner) {
+    if (champion) {
         champDiv.className = 'player champion';
         const nameSpan = document.createElement('span');
-        nameSpan.textContent = `🏆 ${finalMatch.winner.name} 🏆`;
+        nameSpan.textContent = `🏆 ${champion.name} 🏆`;
         champDiv.appendChild(nameSpan);
 
-        appendMembersTooltip(champDiv, finalMatch.winner);
+        appendMembersTooltip(champDiv, champion);
     } else {
         champDiv.className = 'player empty';
         champDiv.textContent = '대기중';
@@ -2173,11 +2281,16 @@ function createMatchDiv(match, rIndex, mIndex) {
     const isFinalPlacementMatch = rIndex === bracketState.length - 1 && slots.length > 2;
     const isFinalQualifyingMatch = isFinalQualifyingRound(rIndex, bracketState[rIndex] || []);
     const fourthPlaceQualifier = isFinalQualifyingMatch ? getFourthPlaceQualifier() : null;
-    const refreshOnScoreBlur = isFinalPlacementMatch || isFinalQualifyingMatch;
+    const lastRoundPlacements = isLastRoundPlacementRound(rIndex, bracketState[rIndex])
+        ? getLastRoundStandings().placements
+        : null;
+    const refreshOnScoreBlur = isFinalPlacementMatch || isFinalQualifyingMatch || Boolean(lastRoundPlacements);
     slots.forEach(slot => {
-        const placement = isFinalPlacementMatch
-            ? getFinalPlacement(match, slot)
-            : getFinalQualifyingPlacement(fourthPlaceQualifier, rIndex, mIndex, slot);
+        const placement = lastRoundPlacements
+            ? lastRoundPlacements[`${mIndex}:${slot}`] || null
+            : isFinalPlacementMatch
+                ? getFinalPlacement(match, slot)
+                : getFinalQualifyingPlacement(fourthPlaceQualifier, rIndex, mIndex, slot);
         const playerDiv = createPlayerDiv(
             match[slot],
             match.winner,
@@ -2471,14 +2584,14 @@ function createPlayerDiv(playerObj, winner, onClick, scoreVal, onScoreChange, op
         div.appendChild(memberScoreEditor);
     }
 
-    if (playerObj === winner) {
-        div.classList.add('winner');
-    } else if (options.placement?.rank === 2) {
+    if (options.placement?.rank === 2) {
         div.classList.add('runner-up');
     } else if (options.placement?.rank === 3) {
         div.classList.add('third-place');
     } else if (options.placement?.rank === 4) {
         div.classList.add('fourth-place');
+    } else if (playerObj === winner) {
+        div.classList.add('winner');
     } else if (winner !== null && playerObj !== winner) {
         div.classList.add('loser');
     }

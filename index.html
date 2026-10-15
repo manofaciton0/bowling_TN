@@ -47,7 +47,6 @@
             <option value="0">예선 12강</option>
             <option value="1">본선 12강</option>
             <option value="2">본선 6강</option>
-            <option value="3">결승</option>
         </select>
         <button id="btn-notice-stop" class="notice-control-btn notice-stop-btn" type="button" disabled>
             <span aria-hidden="true">⏹</span> 공지 정지
@@ -179,8 +178,8 @@
                     다만 다운로드해 둔 파일이 있으면 대진 복원 버튼으로 다시 불러올 수 있습니다.
                 </li>
                 <li>
-                    <strong>결승전 점수 입력 후 순위가 자동 확정됩니다.</strong>
-                    결승전 점수가 입력되고 챔피온이 결정되면 결승 3팀 중 점수가 가장 낮은 팀은 3등, 본선 6강에서 결승에 진출하지 못한 3팀 중 점수가 가장 높은 팀은 4등으로 확정됩니다.
+                    <strong>본선 6강 점수 입력 후 순위가 자동 확정됩니다.</strong>
+                    본선 6강 3경기의 승패와 점수가 모두 입력되면 승리한 3팀의 점수 순서대로 1등, 2등, 3등이 정해지고, 패배한 3팀 중 점수가 가장 높은 팀은 4등으로 확정됩니다. 동점이면 순위가 자동으로 확정되지 않습니다.
                 </li>
             </ol>
         </div>
@@ -192,7 +191,7 @@
             publishableKey: 'sb_publishable_VEhr9C6_BMIebXpKYBpgQg_JBRCjxC_'
         };
         window.BOWLING_BRACKET_CONFIG = {
-            version: '18-team-12-prelim-final3-v1',
+            version: '18-team-12-prelim-six-ranking-v1',
             title: '아이씨바이오 400억돌파기념 볼링대회',
             format: {
                 totalTeams: 18,
@@ -201,7 +200,8 @@
                 finalRoundTeamCount: 3,
                 byeRule: '예선 6경기 승자 6팀이 대기 6팀과 본선 12강을 치릅니다.',
                 directMainLegendText: '경기 없이 본선 12강 대기',
-                roundTitles: ['예선 12강', '본선 12강', '본선 6강', '결승'],
+                placementRule: 'last-round-winner-scores',
+                roundTitles: ['예선 12강', '본선 12강', '본선 6강'],
                 preliminaryRoutes: [
                     { matchIndex: 0, slot: 'p1' },
                     { matchIndex: 1, slot: 'p1' },
