@@ -1,6 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     fetchData();
     initializeSupabaseTournamentState();
+    document.getElementById('btn-roster')?.addEventListener('click', openRosterEditor);
+    document.getElementById('btn-roster-close')?.addEventListener('click', () => document.getElementById('roster-modal').close());
+    document.getElementById('roster-form')?.addEventListener('submit', saveRoster);
+    document.getElementById('roster-modal')?.addEventListener('close', () => {
+        document.getElementById('btn-roster')?.setAttribute('aria-expanded', 'false');
+    });
 
     const btnDownload = document.getElementById('btn-download');
     const btnRestore = document.getElementById('btn-restore');
@@ -237,6 +243,7 @@ function updateAdminAuthUi(user, unavailableLabel = '') {
     document.body.classList.toggle('admin-authenticated', Boolean(currentAdminUser));
     document.body.classList.toggle('admin-read-only', !currentAdminUser);
     if (!currentAdminUser) setHelpModalState(false);
+    if (!currentAdminUser) document.getElementById('roster-modal')?.close();
 
     const button = document.getElementById('btn-admin-auth');
     if (!button) return;
@@ -270,6 +277,7 @@ function updateAdminAccessUi() {
     const adminControls = [
         'btn-restore',
         'btn-reset',
+        'btn-roster',
         'btn-notice',
         'btn-team-status',
         'round-result-select',
@@ -993,77 +1001,15 @@ function setTheme(theme) {
 }
 
 // === [사용자 설정] 대진표 선수/팀 데이터 ===
-// 웹 서버(CORS) 없이 로컬 파일만 더블 클릭해서 실행할 수 있도록 데이터 파일의 내용을 자바스크립트에 내장했습니다.
-// 선수 명단이나 팀명을 수정하려면 이 변수 내부의 데이터를 편집해 주세요.
-const localTournamentData = {
-  "version": TOURNAMENT_VERSION,
-  "title": TOURNAMENT_TITLE,
-  "format": {
-    "totalTeams": TOTAL_TEAMS,
-    "preliminaryTeams": PRELIMINARY_TEAMS,
-    "directMainTeams": DIRECT_MAIN_TEAMS,
-    "finalRoundTeamCount": FINAL_ROUND_TEAM_COUNT,
-    "byeRule": BYE_RULE
-  },
-  "players": [
-  { "name": "1팀", "members": ["안홍주", "한동찬", "박윤경", "차지훈"] },
-  { "name": "2팀", "members": ["조영", "김수빈", "강소희", "이혜선"] },
-  { "name": "3팀", "members": ["최봉락", "이규승", "김정은", "한수연"] },
-  { "name": "4팀", "members": ["이호균", "박철우", "김민기", "구소영"] },
-  { "name": "5팀", "members": ["임해식", "손제민", "이송희", "김용주"] },
-  { "name": "6팀", "members": ["김영제", "김정환", "황서연", "이서하"] },
-  { "name": "7팀", "members": ["박시훈", "이길용", "한지원", "김민기(전략)"] },
-  { "name": "8팀", "members": ["황윤하", "이찬양", "서혜지", "김묘덕"] },
-  { "name": "9팀", "members": ["이호경", "김다찬", "정해림", "공석"] },
-  { "name": "10팀", "members": ["박세준", "이시영", "오미선", "이은진"] },
-  { "name": "11팀", "members": ["정재운", "이황열", "장예안", "황찬선"] },
-  { "name": "12팀", "members": ["김종현", "이영웅", "최용훈", "신민경"] },
-  { "name": "13팀", "members": ["이경민", "이효수", "장지영", "정헌"] },
-  { "name": "14팀", "members": ["이상범", "김성주", "조덕현", "기지희"] },
-  { "name": "15팀", "members": ["민동현", "백창건", "유수정", "황인찬"] },
-  { "name": "16팀", "members": ["홍우석", "김태형", "김진", "송정아"] },
-  { "name": "17팀", "members": ["정상현", "최진성", "김슬기", "윤혜빈"] },
-  { "name": "18팀", "members": ["천일범", "이민규", "문진규", "이소정"] }
-]
-};
-
+// DB 응답 전에는 이 기기에 저장된 최신 명단을 사용합니다.
 function fetchData() {
-    try {
-        loadTournamentData(localTournamentData);
-    } catch (error) {
-        console.warn('로컬 데이터 로드 실패. 내장 더미 데이터를 사용합니다.', error);
-        setTournamentTitle(TOURNAMENT_TITLE);
-        const fallbackPlayers = createFallbackPlayers();
-        if (loadSavedState(fallbackPlayers)) {
-            renderBracket();
-            return;
-        }
-        initBracket(fallbackPlayers);
-    }
-}
-
-function loadTournamentData(data) {
-    setTournamentTitle(data.title || TOURNAMENT_TITLE);
-    const sourcePlayers = normalizePlayers(data.players);
-
-    if (loadSavedState(sourcePlayers)) {
+    setTournamentTitle(TOURNAMENT_TITLE);
+    if (loadSavedState()) {
         renderBracket();
         return;
     }
-
-    tournamentPlayers = sourcePlayers;
-
-    if (data.version === TOURNAMENT_VERSION && Array.isArray(data.bracketState)) {
-        bracketState = data.bracketState;
-        normalizeBracketState();
-        saveToLocalStorage();
-        renderBracket();
-        return;
-    }
-
-    initBracket(tournamentPlayers);
+    initBracket([]);
 }
-
 function loadSavedState(sourcePlayers = null) {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return false;
@@ -1107,13 +1053,13 @@ function arePlayerListsSame(a, b) {
     });
 }
 
-function normalizePlayers(players, fallback = createFallbackPlayers()) {
+function normalizePlayers(players) {
     const normalized = Array.isArray(players)
         ? players.filter(player => player && player.name).slice(0, TOTAL_TEAMS)
         : [];
 
     for (let i = normalized.length; i < TOTAL_TEAMS; i++) {
-        normalized.push(fallback[i] || { name: `${i + 1}팀`, members: [] });
+        normalized.push({ name: `${i + 1}팀`, members: [] });
     }
 
     return normalized;
@@ -1301,11 +1247,95 @@ function saveToLocalStorage() {
     scheduleRemoteTournamentStateSave();
 }
 
+function openRosterEditor() {
+    if (!requireAdminAccess('팀원 편집')) return;
+    const dialog = document.getElementById('roster-modal');
+    const fields = document.getElementById('roster-fields');
+    fields.replaceChildren();
+    dialog.dataset.players = JSON.stringify(tournamentPlayers);
+    document.getElementById('roster-message').textContent = '';
+    normalizePlayers(tournamentPlayers).forEach((team, index) => {
+        const label = document.createElement('label');
+        label.className = 'roster-team';
+        const title = document.createElement('strong');
+        title.textContent = team.name;
+        const input = document.createElement('textarea');
+        input.name = `team-${index}`;
+        input.rows = Math.max(4, team.members?.length || 0);
+        input.value = (team.members || []).join('\n');
+        input.placeholder = '한 줄에 한 명씩 입력';
+        input.maxLength = 1000;
+        label.append(title, input);
+        fields.appendChild(label);
+    });
+    document.getElementById('btn-roster').setAttribute('aria-expanded', 'true');
+    dialog.showModal();
+}
+
+async function saveRoster(event) {
+    event.preventDefault();
+    if (!requireAdminAccess('팀원 편집')) return;
+    const dialog = document.getElementById('roster-modal');
+    const message = document.getElementById('roster-message');
+    if (dialog.dataset.players !== JSON.stringify(tournamentPlayers)) {
+        message.textContent = '다른 곳에서 명단이 변경되었습니다. 창을 닫고 다시 열어주세요.';
+        return;
+    }
+    const players = normalizePlayers(tournamentPlayers).map((team, index) => ({
+        ...team,
+        members: event.currentTarget.elements.namedItem(`team-${index}`).value
+            .split(/\r?\n/).map(name => name.trim()).filter(Boolean)
+    }));
+    const teamsByName = new Map(players.map(team => [team.name, team]));
+    const nextBracket = JSON.parse(JSON.stringify(bracketState));
+    nextBracket.forEach(round => round.forEach(match => {
+        getMatchSlots(match).forEach(slot => {
+            const team = teamsByName.get(match[slot]?.name);
+            if (!team) return;
+            match[slot] = team;
+            const previousScores = match[`${slot}MemberScores`] || [];
+            match[`${slot}MemberScores`] = normalizeMemberScores(previousScores, team);
+            if (previousScores.some(score => score !== '' && score !== null && score !== undefined)) {
+                match[`${slot}Score`] = calculateMemberScoreTotal(match[`${slot}MemberScores`]);
+            }
+        });
+        if (match.winner && teamsByName.has(match.winner.name)) {
+            match.winner = teamsByName.get(match.winner.name);
+        }
+    }));
+    const button = event.currentTarget.querySelector('[type="submit"]');
+    button.disabled = true;
+    message.textContent = '저장 중…';
+    try {
+        if (!bowlingSupabaseClient) throw new Error('DB에 연결할 수 없습니다.');
+        if (remoteSaveInFlight || remoteSavePending) {
+            throw new Error('경기 내용을 저장 중입니다. 잠시 후 다시 저장해주세요.');
+        }
+        const { data, error } = await bowlingSupabaseClient
+            .from('tournament_state')
+            .update({ players, bracket_state: nextBracket })
+            .eq('id', SUPABASE_TOURNAMENT_ID)
+            .eq('version', remoteTournamentVersion)
+            .select('id, players, bracket_state, display_state, version, updated_at')
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error('대진 상태가 변경되었습니다. 새로고침 후 다시 시도해주세요.');
+        applyRemoteTournamentState(data);
+        dialog.close();
+        showToast('팀원 명단을 저장했습니다. 초기화 후에도 이 명단을 사용합니다.');
+    } catch (error) {
+        console.error('팀원 명단 저장 실패:', error);
+        message.textContent = error.message || '명단 저장에 실패했습니다. 다시 시도해주세요.';
+    } finally {
+        button.disabled = false;
+    }
+}
+
 function resetBracket() {
     if (!requireAdminAccess('대진표 초기화')) return;
-    if (confirm('정말로 대진표를 초기화하시겠습니까?\n모든 진출 결과와 입력하신 점수가 영구 삭제됩니다.')) {
+    if (confirm('현재 팀원 명단으로 대진표를 초기화하시겠습니까?\n팀원 명단은 유지되고, 모든 진출 결과와 입력하신 점수가 영구 삭제됩니다.')) {
         localStorage.removeItem(STORAGE_KEY);
-        fetchData();
+        initBracket(tournamentPlayers);
         showToast('대진표가 완전히 초기화되었습니다.');
     }
 }
@@ -1382,7 +1412,7 @@ function restoreFromBackup(data) {
     }
 
     const restoredPlayers = normalizePlayers(data.players);
-    if (!arePlayerListsSame(restoredPlayers, normalizePlayers(localTournamentData.players))) {
+    if (!arePlayerListsSame(restoredPlayers, tournamentPlayers)) {
         const shouldContinue = confirm('백업 파일의 팀 목록이 현재 팀 목록과 다릅니다.\n백업 파일의 팀 목록과 대진 상태로 복원하시겠습니까?');
         if (!shouldContinue) return;
     }
@@ -2721,83 +2751,6 @@ function setTournamentTitle(title) {
 function getTournamentTitle() {
     const titleEl = document.getElementById('tournament-title');
     return titleEl?.textContent || TOURNAMENT_TITLE;
-}
-
-function createFallbackPlayers() {
-    return[
-    {
-        name: '1팀',
-        members: ['김수빈', '백창건', '김정환', '김정은']
-    },
-    {
-        name: '2팀',
-        members: ['이상범', '김묘덕', '이찬양', '김민기(전략)']
-    },
-    {
-        name: '3팀',
-        members: ['박철우', '김민기', '황인찬', '송정아']
-    },
-    {
-        name: '4팀',
-        members: ['정재운', '김용주', '이시영', '한수연']
-    },
-    {
-        name: '5팀',
-        members: ['김영제', '김성주', '유수정', '오미선']
-    },
-    {
-        name: '6팀',
-        members: ['임해식', '장지영', '정헌', '한동찬']
-    },
-    {
-        name: '7팀',
-        members: ['최진성', '이호균', '홍우석', '이서하']
-    },
-    {
-        name: '8팀',
-        members: ['민동현', '정해림', '김슬기', '기지희']
-    },
-    {
-        name: '9팀',
-        members: ['박시훈', '이규승', '장은채', '차지훈']
-    },
-    {
-        name: '10팀',
-        members: ['최봉락', '천일범', '강소희', '구소영']
-    },
-    {
-        name: '11팀',
-        members: ['이효수', '이민규', '장예안', '이은지']
-    },
-    {
-        name: '12팀',
-        members: ['안홍주', '이혜선', '조덕현', '박윤경']
-    },
-    {
-        name: '13팀',
-        members: ['황윤하', '이송희', '김진', '김지선']
-    },
-    {
-        name: '14팀',
-        members: ['이호경', '권성수', '문진규', '이은진']
-    },
-    {
-        name: '15팀',
-        members: ['이경민', '정상현', '김다찬', '황서연']
-    },
-    {
-        name: '16팀',
-        members: ['김태형', '이황열', '김종현', '신민경']
-    },
-    {
-        name: '17팀',
-        members: ['조영', '이영웅', '손제민', '한지원']
-    },
-    {
-        name: '18팀',
-        members: ['박세준', '이길용', '최용훈', '황찬선']
-    }
-];
 }
 
 function showToast(message) {
