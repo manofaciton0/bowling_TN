@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-    fetchData();
-    initializeSupabaseTournamentState();
     document.getElementById('btn-roster')?.addEventListener('click', openRosterEditor);
     document.getElementById('btn-roster-close')?.addEventListener('click', () => document.getElementById('roster-modal').close());
     document.getElementById('roster-form')?.addEventListener('submit', saveRoster);
     document.getElementById('roster-modal')?.addEventListener('close', () => {
         document.getElementById('btn-roster')?.setAttribute('aria-expanded', 'false');
     });
+    fetchData();
+    initializeSupabaseTournamentState();
 
     const btnDownload = document.getElementById('btn-download');
     const btnRestore = document.getElementById('btn-restore');
